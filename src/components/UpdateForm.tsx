@@ -1,349 +1,319 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMetrics } from '../context/MetricsContext';
-import { Save, RotateCcw, DollarSign, Calendar } from 'lucide-react';
-import { INITIAL_DATA } from '../constants';
+import { MetricsData } from '../types';
 
-const formatCurrency = (value: number) => {
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+function toNumber(v: string) {
+  // aceita "29,70" também
+  const normalized = v.replace(/\./g, '').replace(',', '.');
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : 0;
+}
 
-const formatQuantity = (value: number) => {
-  return value.toLocaleString('pt-BR');
+function formatInputNumber(n: number) {
+  // mantém simples para input
+  if (!Number.isFinite(n)) return '';
+  return String(n);
+}
+
+const Field: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  right?: React.ReactNode;
+}> = ({ label, value, onChange, right }) => (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between">
+      <label className="text-xs font-semibold text-gray-600">{label}</label>
+      {right}
+    </div>
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200"
+    />
+  </div>
+);
+
+const SectionCard: React.FC<{ title: string; tone?: 'orange' | 'green' | 'gray'; children: React.ReactNode }> = ({
+  title,
+  tone = 'gray',
+  children,
+}) => {
+  const toneClass =
+    tone === 'orange'
+      ? 'bg-orange-50 border-orange-100'
+      : tone === 'green'
+      ? 'bg-green-50 border-green-100'
+      : 'bg-white border-gray-200';
+
+  const titleClass = tone === 'orange' ? 'text-orange-600' : tone === 'green' ? 'text-green-700' : 'text-gray-800';
+
+  return (
+    <div className={`rounded-2xl border p-5 ${toneClass}`}>
+      <h3 className={`text-lg font-bold ${titleClass}`}>{title}</h3>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
 };
 
 const UpdateForm: React.FC = () => {
-  const { data, updateData } = useMetrics();
-  const [localData, setLocalData] = useState(data);
+  const { data, updateData, resetDefaults } = useMetrics();
+
+  // Draft local (para só salvar quando clicar)
+  const [draft, setDraft] = useState<MetricsData>(data);
 
   useEffect(() => {
-    setLocalData(data);
+    setDraft(data);
   }, [data]);
 
-  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
-    let val = e.target.value.replace(/\D/g, '');
-    const numberVal = val ? parseFloat(val) / 100 : 0;
-    setLocalData(prev => ({ ...prev, [field]: numberVal }));
+  const setDraftField = (key: keyof MetricsData, value: string | number) => {
+    setDraft((prev) => ({ ...prev, [key]: value } as MetricsData));
   };
 
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
-    let val = e.target.value.replace(/\D/g, '');
-    const numberVal = val ? parseInt(val, 10) : 0;
-    setLocalData(prev => ({ ...prev, [field]: numberVal }));
-  };
-  
-  const handleGenericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setLocalData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+  // Inputs (string) para evitar briga com vírgula/ponto
+  const inputs = useMemo(() => {
+    const d = draft;
+
+    return {
+      currentMonth: d.currentMonth ?? '',
+      daysRemaining: formatInputNumber(d.daysRemaining ?? 0),
+      teamSize: formatInputNumber(d.teamSize ?? 1),
+
+      currentSales: formatInputNumber(d.currentSales ?? 0),
+      targetSales: formatInputNumber(d.targetSales ?? 0),
+      bonusValueSales: formatInputNumber(d.bonusValueSales ?? 0),
+
+      currentTicket: formatInputNumber(d.currentTicket ?? 0),
+      targetTicket: formatInputNumber(d.targetTicket ?? 0),
+      bonusValueTicket: formatInputNumber(d.bonusValueTicket ?? 0),
+
+      currentRevenue: formatInputNumber(d.currentRevenue ?? 0),
+
+      targetRevenueTier1: formatInputNumber(d.targetRevenueTier1 ?? 0),
+      targetRevenueTier2: formatInputNumber(d.targetRevenueTier2 ?? 0),
+      targetRevenueTier3: formatInputNumber(d.targetRevenueTier3 ?? 0),
+
+      bonusTier1: formatInputNumber(d.bonusTier1 ?? 0),
+      bonusTier2: formatInputNumber(d.bonusTier2 ?? 0),
+      bonusTier3: formatInputNumber(d.bonusTier3 ?? 0),
+    };
+  }, [draft]);
+
+  const handleSave = () => {
+    // Converte números antes de gravar
+    updateData({
+      currentMonth: inputs.currentMonth,
+      daysRemaining: Math.max(0, Math.round(toNumber(inputs.daysRemaining))),
+      teamSize: Math.max(1, Math.round(toNumber(inputs.teamSize))),
+
+      currentSales: Math.max(0, Math.round(toNumber(inputs.currentSales))),
+      targetSales: Math.max(0, Math.round(toNumber(inputs.targetSales))),
+      bonusValueSales: Math.max(0, toNumber(inputs.bonusValueSales)),
+
+      currentTicket: Math.max(0, toNumber(inputs.currentTicket)),
+      targetTicket: Math.max(0, toNumber(inputs.targetTicket)),
+      bonusValueTicket: Math.max(0, toNumber(inputs.bonusValueTicket)),
+
+      currentRevenue: Math.max(0, toNumber(inputs.currentRevenue)),
+
+      targetRevenueTier1: Math.max(0, toNumber(inputs.targetRevenueTier1)),
+      targetRevenueTier2: Math.max(0, toNumber(inputs.targetRevenueTier2)),
+      targetRevenueTier3: Math.max(0, toNumber(inputs.targetRevenueTier3)),
+
+      bonusTier1: Math.max(0, toNumber(inputs.bonusTier1)),
+      bonusTier2: Math.max(0, toNumber(inputs.bonusTier2)),
+      bonusTier3: Math.max(0, toNumber(inputs.bonusTier3)),
+    });
   };
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setLocalData(prev => ({ ...prev, [name]: value }));
+  const handleRestore = () => {
+    resetDefaults();
   };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateData(localData);
-    alert('Dados atualizados com sucesso!');
-  };
-
-  const handleReset = () => {
-    if(confirm('Tem certeza que deseja restaurar os valores padrão?')) {
-        setLocalData(INITIAL_DATA);
-        updateData(INITIAL_DATA);
-    }
-  };
-
-  const baseInputClasses = "w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-lime focus:border-brand-lime outline-none transition text-brand-lime font-bold text-lg bg-white placeholder-gray-300";
-  const currencyInputClasses = `${baseInputClasses} pl-10`; 
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 max-w-4xl mx-auto border border-gray-100 mb-8">
-      <div className="mb-6 md:mb-8 border-b pb-4">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800">Atualizar Métricas</h2>
-        <p className="text-sm md:text-base text-gray-500">Configure as metas, mês de referência e os valores das bonificações.</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        
-        {/* Period Settings */}
-        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
-               <Calendar size={20} className="text-gray-500"/>
-               Configurações do Período
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mês de Referência</label>
-                  <input
-                    type="text"
-                    name="currentMonth"
-                    value={localData.currentMonth}
-                    onChange={handleTextChange}
-                    className={baseInputClasses}
-                    placeholder="Ex: Fevereiro 2026"
-                  />
-                </div>
-                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Dias Restantes</label>
-                   <input
-                    type="number"
-                    name="daysRemaining"
-                    value={localData.daysRemaining}
-                    onChange={handleGenericChange}
-                    className={baseInputClasses}
-                  />
-                </div>
-            </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">Atualizar Dados</h2>
+          <p className="text-sm text-gray-500">Edite os valores e clique em “Salvar Configurações”.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* Sales Section */}
-          <div className="bg-orange-50 p-6 rounded-xl border border-orange-100">
-            <h3 className="font-bold text-brand-orange mb-4 flex items-center gap-2 text-lg">
-              Meta 01: Volume de Vendas
-            </h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Realizado</label>
-                    <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0.000"
-                    value={localData.currentSales === 0 ? '' : formatQuantity(localData.currentSales)}
-                    onChange={(e) => handleQuantityChange(e, 'currentSales')}
-                    className={baseInputClasses}
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Meta (Qtd)</label>
-                    <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0.000"
-                    value={localData.targetSales === 0 ? '' : formatQuantity(localData.targetSales)}
-                    onChange={(e) => handleQuantityChange(e, 'targetSales')}
-                    className={baseInputClasses}
-                    />
-                </div>
-              </div>
-              
-              <div className="pt-4 border-t border-orange-200">
-                 <label className="block text-xs font-bold text-orange-800 uppercase mb-1 flex items-center gap-1">
-                    <DollarSign size={12}/> Valor do Bônus (Se atingido)
-                 </label>
-                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="00,00"
-                    value={localData.bonusValueSales === 0 ? '' : formatCurrency(localData.bonusValueSales)}
-                    onChange={(e) => handleCurrencyChange(e, 'bonusValueSales')}
-                    className={currencyInputClasses}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Ticket Section */}
-          <div className="bg-green-50 p-6 rounded-xl border border-green-100">
-            <h3 className="font-bold text-green-700 mb-4 flex items-center gap-2 text-lg">
-              Meta 02: Ticket Médio
-            </h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Atual</label>
-                    <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="00,00"
-                        value={localData.currentTicket === 0 ? '' : formatCurrency(localData.currentTicket)}
-                        onChange={(e) => handleCurrencyChange(e, 'currentTicket')}
-                        className={currencyInputClasses}
-                    />
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Meta</label>
-                    <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="00,00"
-                        value={localData.targetTicket === 0 ? '' : formatCurrency(localData.targetTicket)}
-                        onChange={(e) => handleCurrencyChange(e, 'targetTicket')}
-                        className={currencyInputClasses}
-                    />
-                    </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-green-200">
-                 <label className="block text-xs font-bold text-green-800 uppercase mb-1 flex items-center gap-1">
-                    <DollarSign size={12}/> Valor do Bônus (Se atingido)
-                 </label>
-                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="00,00"
-                    value={localData.bonusValueTicket === 0 ? '' : formatCurrency(localData.bonusValueTicket)}
-                    onChange={(e) => handleCurrencyChange(e, 'bonusValueTicket')}
-                    className={currencyInputClasses}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Revenue Section */}
-          <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 md:col-span-2">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
-              Meta 03: Faturamento Bruto (Escalonado)
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Faturamento Atual</label>
-                <div className="relative">
-                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                   <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="00,00"
-                    value={localData.currentRevenue === 0 ? '' : formatCurrency(localData.currentRevenue)}
-                    onChange={(e) => handleCurrencyChange(e, 'currentRevenue')}
-                    className={currencyInputClasses}
-                  />
-                </div>
-              </div>
-               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Equipe (Qtd Pessoas)</label>
-                <input
-                  type="number"
-                  name="teamSize"
-                  value={localData.teamSize}
-                  onChange={handleGenericChange}
-                  className={baseInputClasses}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4 border-t pt-4">
-                <p className="text-sm font-bold text-gray-700">Configuração dos Níveis</p>
-                
-                {/* Tier 1 */}
-                <div className="grid grid-cols-2 gap-4 items-center">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Meta Nível 1 (Bronze)</label>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatCurrency(localData.targetRevenueTier1)}
-                            disabled
-                            className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 text-sm font-medium" 
-                        />
-                    </div>
-                     <div>
-                        <label className="block text-xs text-gray-500 mb-1">Bônus Nível 1</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none text-xs">R$</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localData.bonusValueRevenueT1 === 0 ? '' : formatCurrency(localData.bonusValueRevenueT1)}
-                                onChange={(e) => handleCurrencyChange(e, 'bonusValueRevenueT1')}
-                                className={`${currencyInputClasses} py-1 text-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tier 2 */}
-                <div className="grid grid-cols-2 gap-4 items-center">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Meta Nível 2 (Prata)</label>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatCurrency(localData.targetRevenueTier2)}
-                            disabled
-                             className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 text-sm font-medium" 
-                        />
-                    </div>
-                     <div>
-                        <label className="block text-xs text-gray-500 mb-1">Bônus Nível 2</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none text-xs">R$</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localData.bonusValueRevenueT2 === 0 ? '' : formatCurrency(localData.bonusValueRevenueT2)}
-                                onChange={(e) => handleCurrencyChange(e, 'bonusValueRevenueT2')}
-                                className={`${currencyInputClasses} py-1 text-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                 {/* Tier 3 */}
-                 <div className="grid grid-cols-2 gap-4 items-center">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Meta Nível 3 (Ouro)</label>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatCurrency(localData.targetRevenueTier3)}
-                            disabled
-                            className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 text-sm font-medium" 
-                        />
-                    </div>
-                     <div>
-                        <label className="block text-xs text-gray-500 mb-1">Bônus Nível 3</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none text-xs">R$</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localData.bonusValueRevenueT3 === 0 ? '' : formatCurrency(localData.bonusValueRevenueT3)}
-                                onChange={(e) => handleCurrencyChange(e, 'bonusValueRevenueT3')}
-                                className={`${currencyInputClasses} py-1 text-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col-reverse md:flex-row justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white/90 backdrop-blur pb-4">
+        <div className="flex gap-3">
           <button
+            onClick={handleRestore}
+            className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
             type="button"
-            onClick={handleReset}
-            className="flex justify-center items-center gap-2 px-6 py-3 md:py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition w-full md:w-auto border md:border-none border-gray-200"
           >
-            <RotateCcw size={18} />
             Restaurar Padrões
           </button>
+
           <button
-            type="submit"
-            className="flex justify-center items-center gap-2 px-8 py-3 md:py-2 bg-brand-orange text-white rounded-lg hover:bg-orange-600 shadow-lg shadow-orange-200 transition transform hover:-translate-y-0.5 w-full md:w-auto font-bold"
+            onClick={handleSave}
+            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-5 py-2 text-sm font-bold text-white hover:bg-orange-600"
+            type="button"
           >
-            <Save size={18} />
             Salvar Configurações
           </button>
         </div>
-      </form>
+      </div>
+
+      {/* Top fields */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SectionCard title="Mês" tone="gray">
+          <Field
+            label="Mês / Ano"
+            value={inputs.currentMonth}
+            onChange={(v) => setDraftField('currentMonth', v)}
+          />
+        </SectionCard>
+
+        <SectionCard title="Dias restantes" tone="gray">
+          <Field
+            label="Dias"
+            value={inputs.daysRemaining}
+            onChange={(v) => setDraftField('daysRemaining', toNumber(v))}
+          />
+        </SectionCard>
+
+        <SectionCard title="Equipe" tone="gray">
+          <Field
+            label="Qtd Pessoas"
+            value={inputs.teamSize}
+            onChange={(v) => setDraftField('teamSize', toNumber(v))}
+          />
+        </SectionCard>
+      </div>
+
+      {/* Meta 01 + Meta 02 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SectionCard title="Meta 01: Volume de Vendas" tone="orange">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Realizado (Qtd)"
+              value={inputs.currentSales}
+              onChange={(v) => setDraftField('currentSales', toNumber(v))}
+            />
+            <Field
+              label="Meta (Qtd)"
+              value={inputs.targetSales}
+              onChange={(v) => setDraftField('targetSales', toNumber(v))}
+            />
+          </div>
+
+          <div className="mt-4">
+            <Field
+              label="Valor do bônus (se atingido)"
+              value={inputs.bonusValueSales}
+              onChange={(v) => setDraftField('bonusValueSales', toNumber(v))}
+            />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Meta 02: Ticket Médio" tone="green">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Atual (R$)"
+              value={inputs.currentTicket}
+              onChange={(v) => setDraftField('currentTicket', toNumber(v))}
+            />
+            <Field
+              label="Meta (R$)"
+              value={inputs.targetTicket}
+              onChange={(v) => setDraftField('targetTicket', toNumber(v))}
+            />
+          </div>
+
+          <div className="mt-4">
+            <Field
+              label="Valor do bônus (se atingido)"
+              value={inputs.bonusValueTicket}
+              onChange={(v) => setDraftField('bonusValueTicket', toNumber(v))}
+            />
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Meta 03 */}
+      <SectionCard title="Meta 03: Faturamento Bruto (Escalonado)" tone="gray">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Field
+            label="Faturamento Atual (R$)"
+            value={inputs.currentRevenue}
+            onChange={(v) => setDraftField('currentRevenue', toNumber(v))}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Equipe (Qtd Pessoas)"
+              value={inputs.teamSize}
+              onChange={(v) => setDraftField('teamSize', toNumber(v))}
+            />
+            <Field
+              label="Dias restantes"
+              value={inputs.daysRemaining}
+              onChange={(v) => setDraftField('daysRemaining', toNumber(v))}
+            />
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h4 className="text-sm font-bold text-gray-800 mb-3">Configuração dos Níveis</h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field
+              label="Meta Nível 1"
+              value={inputs.targetRevenueTier1}
+              onChange={(v) => setDraftField('targetRevenueTier1', toNumber(v))}
+            />
+            <Field
+              label="Bônus Nível 1"
+              value={inputs.bonusTier1}
+              onChange={(v) => setDraftField('bonusTier1', toNumber(v))}
+            />
+
+            <Field
+              label="Meta Nível 2"
+              value={inputs.targetRevenueTier2}
+              onChange={(v) => setDraftField('targetRevenueTier2', toNumber(v))}
+            />
+            <Field
+              label="Bônus Nível 2"
+              value={inputs.bonusTier2}
+              onChange={(v) => setDraftField('bonusTier2', toNumber(v))}
+            />
+
+            <Field
+              label="Meta Nível 3"
+              value={inputs.targetRevenueTier3}
+              onChange={(v) => setDraftField('targetRevenueTier3', toNumber(v))}
+            />
+            <Field
+              label="Bônus Nível 3"
+              value={inputs.bonusTier3}
+              onChange={(v) => setDraftField('bonusTier3', toNumber(v))}
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={handleRestore}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            type="button"
+          >
+            Restaurar Padrões
+          </button>
+
+          <button
+            onClick={handleSave}
+            className="rounded-xl bg-orange-500 px-5 py-2 text-sm font-bold text-white hover:bg-orange-600"
+            type="button"
+          >
+            Salvar Configurações
+          </button>
+        </div>
+      </SectionCard>
     </div>
   );
 };
