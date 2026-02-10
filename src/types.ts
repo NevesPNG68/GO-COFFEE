@@ -1,65 +1,57 @@
-// src/types.ts
-import React from 'react';
+// types.ts
+export type RevenueTier = 0 | 1 | 2 | 3;
 
 export type MetricsData = {
-  // Gerais
-  currentMonth: string;
-  daysRemaining: number;
-  teamSize: number;
+  // Cabeçalho
+  currentMonthLabel: string; // ex: "Fevereiro 2026"
+  dayOfMonth: number;        // ex: 18
+  teamSize: number;          // qtd pessoas
 
-  // Meta 01
+  // Meta 01 - Volume de Vendas
   currentSales: number;
   targetSales: number;
   bonusValueSales: number;
 
-  // Meta 02
+  // Meta 02 - Ticket Médio
   currentTicket: number;
   targetTicket: number;
   bonusValueTicket: number;
 
-  // Meta 03
+  // Meta 03 - Faturamento Bruto (Escalonado)
   currentRevenue: number;
-
   targetRevenueTier1: number;
   targetRevenueTier2: number;
   targetRevenueTier3: number;
-
-  bonusTier1: number;
-  bonusTier2: number;
-  bonusTier3: number;
+  bonusValueRevenueT1: number;
+  bonusValueRevenueT2: number;
+  bonusValueRevenueT3: number;
 };
 
-export type RevenueTier = 0 | 1 | 2 | 3;
-
 export type MetricsCalculations = {
-  // Meta 01
   salesPct: number;
-  salesRemaining: number;
-  salesMet: boolean;
+  ticketPct: number;
+  revenuePct: number;
 
-  // Meta 02
-  ticketDelta: number; // atual - meta
-  ticketMet: boolean;
+  salesDone: boolean;
+  ticketDone: boolean;
 
-  // Meta 03
   revenueTierAchieved: RevenueTier;
-  revenueTargetCurrent: number; // alvo do próximo tier
-  revenueRemaining: number;     // quanto falta para o próximo tier
-  revenuePctToCurrent: number;  // % até o próximo tier
+  revenueDone: boolean;
 
-  // Total bônus
-  totalTeamBonus: number;       // total para a equipe
-  totalIndividual: number;      // quanto dá por pessoa
+  totalBonusTeam: number;
+  totalBonusIndividual: number;
+
+  gapSales: number;
+  gapTicket: number;
+  gapRevenueToNextTier: number;
 };
 
 export type MetricsContextValue = {
   data: MetricsData;
-
-  // Setter REAL do React => aceita setData(prev => ...)
-  setData: React.Dispatch<React.SetStateAction<MetricsData>>;
-
   calculations: MetricsCalculations;
 
-  updateData: (patch: Partial<MetricsData>) => void;
+  // ações
+  setData: (next: MetricsData) => void;
+  update: (patch: Partial<MetricsData>) => void;
   resetDefaults: () => void;
 };
