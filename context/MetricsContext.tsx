@@ -1,84 +1,62 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { KPIData, BonusCalculation } from '../types';
-import { INITIAL_DATA } from '../constants';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 
-interface MetricsContextType {
-  data: KPIData;
-  updateData: (newData: Partial<KPIData>) => void;
-  calculations: BonusCalculation;
+// AJUSTE ESSE IMPORT se você já tem defaults em outro lugar:
+// Ex: import { DEFAULT_METRICS } from '../constants';
+import { DEFAULT_METRICS } from '../constants';
+
+type MetricsContextValue = {
+  metrics: any; // se você tiver tipo pronto, troque "any" pelo seu tipo (ex: MetricsState)
+  setMetrics: React.Dispatch<React.SetStateAction<any>>;
+  resetMetrics: () => void;
+};
+
+const MetricsContext = createContext<MetricsContextValue | null>(null);
+
+const STORAGE_KEY = 'go-coffee-metrics-v1';
+
+function safeParse<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }
 
-const MetricsContext = createContext<MetricsContextType | undefined>(undefined);
-
 export const MetricsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<KPIData>(INITIAL_DATA);
-  const [calculations, setCalculations] = useState<BonusCalculation>({
-    salesBonus: 0,
-    ticketBonus: 0,
-    revenueBonus: 0,
-    totalIndividual: 0,
-    totalTeam: 0,
-    isTicketLocked: true,
-    maxPotentialIndividual: 0,
+  // 1) CARREGA DO LOCALSTORAGE
+  const [metrics, setMetrics] = useState<any>(() => {
+    const saved = safeParse<any>(localStorage.getItem(STORAGE_KEY));
+    return saved ?? DEFAULT_METRICS;
   });
 
+  // 2) GRAVA AUTOMATICAMENTE AO ALTERAR
   useEffect(() => {
-    // Calculate Logic based on Dynamic Data
-    
-    // 1. Sales Bonus (Meta 1)
-    const salesHit = data.currentSales >= data.targetSales;
-    const salesBonus = salesHit ? data.bonusValueSales : 0;
-
-    // 2. Ticket Bonus (Meta 2) - LOCKED if Sales < 1200
-    // "Esta meta só será paga se a Meta 1 (1.200 vendas) for alcançada."
-    const isTicketLocked = !salesHit;
-    const ticketHit = data.currentTicket >= data.targetTicket;
-    const ticketBonus = (ticketHit && !isTicketLocked) ? data.bonusValueTicket : 0;
-
-    // 3. Revenue Bonus (Meta 3) - Tiered
-    let revenueBonus = 0;
-    if (data.currentRevenue >= data.targetRevenueTier3) {
-      revenueBonus = data.bonusValueRevenueT3;
-    } else if (data.currentRevenue >= data.targetRevenueTier2) {
-      revenueBonus = data.bonusValueRevenueT2;
-    } else if (data.currentRevenue >= data.targetRevenueTier1) {
-      revenueBonus = data.bonusValueRevenueT1;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(metrics));
+    } catch {
+      // não quebra o app se storage falhar
     }
+  }, [metrics]);
 
-    const totalIndividual = salesBonus + ticketBonus + revenueBonus;
-    const totalTeam = totalIndividual * data.teamSize;
-
-    // Calculate Max Potential (Total Possible Bonus)
-    // Assumes best case: Sales Hit + Ticket Hit + Top Tier Revenue
-    const maxPotentialIndividual = data.bonusValueSales + data.bonusValueTicket + data.bonusValueRevenueT3;
-
-    setCalculations({
-      salesBonus,
-      ticketBonus,
-      revenueBonus,
-      totalIndividual,
-      totalTeam,
-      isTicketLocked,
-      maxPotentialIndividual
-    });
-
-  }, [data]);
-
-  const updateData = (newData: Partial<KPIData>) => {
-    setData((prev) => ({ ...prev, ...newData }));
+  const resetMetrics = () => {
+    setMetrics(DEFAULT_METRICS);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_METRICS));
+    } catch {}
   };
 
-  return (
-    <MetricsContext.Provider value={{ data, updateData, calculations }}>
-      {children}
-    </MetricsContext.Provider>
+  const value = useMemo(
+    () => ({ metrics, setMetrics, resetMetrics }),
+    [metrics]
   );
+
+  return <MetricsContext.Provider value={value}>{children}</MetricsContext.Provider>;
 };
 
-export const useMetrics = () => {
-  const context = useContext(MetricsContext);
-  if (!context) {
-    throw new Error('useMetrics must be used within a MetricsProvider');
-  }
-  return context;
-};
+export function useMetrics() {
+  const ctx = useContext(MetricsContext);
+  if (!ctx) throw new Error('useMetrics must be used within a MetricsProvider');
+  return ctx;
+}
