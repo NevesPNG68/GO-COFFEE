@@ -70,10 +70,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-12">
-      {/* ✅ TESTE VISÍVEL (prova de que este arquivo está rodando) */}
-      <div className="rounded-xl border border-yellow-300 bg-yellow-200 text-black px-4 py-3 font-extrabold">
-        TESTE DASHBOARD 123
-      </div>
+
 
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-brand-black to-gray-800 rounded-2xl p-5 md:p-8 text-white shadow-2xl relative overflow-hidden">
