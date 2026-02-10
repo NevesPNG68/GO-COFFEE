@@ -1,368 +1,367 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMetrics } from '../context/MetricsContext';
-import { Save, RotateCcw, DollarSign, Calendar } from 'lucide-react';
-import { INITIAL_DATA } from '../constants';
 
-// Utility for formatting
-const formatCurrency = (value: number) => {
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+function toNumberBR(value: string): number {
+  // aceita "1.234,56" ou "1234.56" ou "1234"
+  const cleaned = value
+    .replace(/\s/g, '')
+    .replace(/\./g, '')
+    .replace(/,/g, '.')
+    .replace(/[^\d.-]/g, '');
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
 
-const formatQuantity = (value: number) => {
-  return value.toLocaleString('pt-BR'); // Adds dots: 1.200
-};
+function toIntBR(value: string): number {
+  const n = Math.round(toNumberBR(value));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fmtBR(n: number): string {
+  try {
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  } catch {
+    return String(n);
+  }
+}
 
 const UpdateForm: React.FC = () => {
-  const { data, updateData } = useMetrics();
-  
-  // Local state stores the raw numeric values for logic, but we render masked values via handlers
-  const [localData, setLocalData] = useState(data);
+  const { data, setData, resetDefaults, calculations } = useMetrics();
 
-  // Sync when parent data changes (e.g. reset)
+  // ===== Form state (strings, para não brigar com máscara) =====
+  const [referenceMonth, setReferenceMonth] = useState(data.referenceMonth);
+
+  // Meta 01
+  const [m1Current, setM1Current] = useState(String(data.meta01.current ?? 0));
+  const [m1Target, setM1Target] = useState(String(data.meta01.target ?? 0));
+  const [m1Bonus, setM1Bonus] = useState(String(data.meta01.bonus ?? 0));
+
+  // Meta 02
+  const [m2Current, setM2Current] = useState(String(data.meta02.current ?? 0));
+  const [m2Target, setM2Target] = useState(String(data.meta02.target ?? 0));
+  const [m2Bonus, setM2Bonus] = useState(String(data.meta02.bonus ?? 0));
+
+  // Meta 03
+  const [m3RevenueCurrent, setM3RevenueCurrent] = useState(String(data.meta03.revenueCurrent ?? 0));
+  const [m3TeamSize, setM3TeamSize] = useState(String(data.meta03.teamSize ?? 1));
+
+  const [lvl1Target, setLvl1Target] = useState(String(data.meta03.levels?.[0]?.target ?? 0));
+  const [lvl1Bonus, setLvl1Bonus] = useState(String(data.meta03.levels?.[0]?.bonus ?? 0));
+
+  const [lvl2Target, setLvl2Target] = useState(String(data.meta03.levels?.[1]?.target ?? 0));
+  const [lvl2Bonus, setLvl2Bonus] = useState(String(data.meta03.levels?.[1]?.bonus ?? 0));
+
+  const [lvl3Target, setLvl3Target] = useState(String(data.meta03.levels?.[2]?.target ?? 0));
+  const [lvl3Bonus, setLvl3Bonus] = useState(String(data.meta03.levels?.[2]?.bonus ?? 0));
+
+  // Se o contexto mudar (ex.: reset), reflete no form
   useEffect(() => {
-    setLocalData(data);
+    setReferenceMonth(data.referenceMonth);
+
+    setM1Current(String(data.meta01.current ?? 0));
+    setM1Target(String(data.meta01.target ?? 0));
+    setM1Bonus(String(data.meta01.bonus ?? 0));
+
+    setM2Current(String(data.meta02.current ?? 0));
+    setM2Target(String(data.meta02.target ?? 0));
+    setM2Bonus(String(data.meta02.bonus ?? 0));
+
+    setM3RevenueCurrent(String(data.meta03.revenueCurrent ?? 0));
+    setM3TeamSize(String(data.meta03.teamSize ?? 1));
+
+    setLvl1Target(String(data.meta03.levels?.[0]?.target ?? 0));
+    setLvl1Bonus(String(data.meta03.levels?.[0]?.bonus ?? 0));
+    setLvl2Target(String(data.meta03.levels?.[1]?.target ?? 0));
+    setLvl2Bonus(String(data.meta03.levels?.[1]?.bonus ?? 0));
+    setLvl3Target(String(data.meta03.levels?.[2]?.target ?? 0));
+    setLvl3Bonus(String(data.meta03.levels?.[2]?.bonus ?? 0));
   }, [data]);
 
-  // Handlers for masking
-  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
-    let val = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    const numberVal = val ? parseFloat(val) / 100 : 0;
-    
-    setLocalData(prev => ({
-      ...prev,
-      [field]: numberVal
-    }));
-  };
+  const preview = useMemo(() => {
+    // Preview rápido com base nos inputs (sem depender do calculations atual)
+    const m1t = toNumberBR(m1Target);
+    const m1c = toNumberBR(m1Current);
+    const m1pct = m1t > 0 ? Math.min(100, Math.max(0, (m1c / m1t) * 100)) : 0;
 
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
-    let val = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    const numberVal = val ? parseInt(val, 10) : 0;
+    const m2t = toNumberBR(m2Target);
+    const m2c = toNumberBR(m2Current);
+    const m2ok = m2t > 0 && m2c >= m2t;
 
-    setLocalData(prev => ({
-      ...prev,
-      [field]: numberVal
-    }));
-  };
-  
-  // Generic handler for non-masked numeric fields
-  const handleGenericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setLocalData(prev => ({
-      ...prev,
-      [name]: parseFloat(value) || 0
-    }));
-  };
+    const rev = toNumberBR(m3RevenueCurrent);
+    const t1 = toNumberBR(lvl1Target);
+    const t2 = toNumberBR(lvl2Target);
+    const t3 = toNumberBR(lvl3Target);
 
-  // Handler for text fields (like Month)
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setLocalData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+    let lvl = 0;
+    if (t1 > 0 && rev >= t1) lvl = 1;
+    if (t2 > 0 && rev >= t2) lvl = 2;
+    if (t3 > 0 && rev >= t3) lvl = 3;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateData(localData);
-    alert('Dados atualizados com sucesso!');
+    return { m1pct, m2ok, lvl };
+  }, [m1Target, m1Current, m2Target, m2Current, m3RevenueCurrent, lvl1Target, lvl2Target, lvl3Target]);
+
+  const handleSave = () => {
+    setData((prev) => ({
+      ...prev,
+      referenceMonth: referenceMonth?.trim() || prev.referenceMonth,
+
+      meta01: {
+        current: toIntBR(m1Current),
+        target: toIntBR(m1Target),
+        bonus: toNumberBR(m1Bonus),
+      },
+
+      meta02: {
+        current: toNumberBR(m2Current),
+        target: toNumberBR(m2Target),
+        bonus: toNumberBR(m2Bonus),
+      },
+
+      meta03: {
+        revenueCurrent: toNumberBR(m3RevenueCurrent),
+        teamSize: Math.max(1, toIntBR(m3TeamSize)),
+        levels: [
+          { target: toNumberBR(lvl1Target), bonus: toNumberBR(lvl1Bonus) },
+          { target: toNumberBR(lvl2Target), bonus: toNumberBR(lvl2Bonus) },
+          { target: toNumberBR(lvl3Target), bonus: toNumberBR(lvl3Bonus) },
+        ],
+      },
+    }));
+
+    // feedback simples
+    alert('Configurações salvas ✅');
   };
 
   const handleReset = () => {
-    setLocalData(INITIAL_DATA);
-    updateData(INITIAL_DATA);
+    if (confirm('Restaurar padrões?')) {
+      resetDefaults();
+      alert('Padrões restaurados ✅');
+    }
   };
 
-  const baseInputClasses = "w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-lime focus:border-brand-lime outline-none transition text-brand-lime font-bold text-lg bg-white placeholder-gray-300";
-  const currencyInputClasses = `${baseInputClasses} pl-10`; 
-
   return (
-    <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 max-w-4xl mx-auto border border-gray-100">
-      <div className="mb-6 md:mb-8 border-b pb-4">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800">Atualizar Métricas</h2>
-        <p className="text-sm md:text-base text-gray-500">Configure as metas, mês de referência e os valores das bonificações.</p>
+    <div className="space-y-6">
+      {/* Topo (Mês de referência + dia, se você quiser depois) */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-semibold text-gray-700">Mês de Referência</label>
+            <input
+              value={referenceMonth}
+              onChange={(e) => setReferenceMonth(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+              placeholder="Ex.: Fevereiro 2026"
+            />
+          </div>
+
+          <div className="flex items-center justify-between md:justify-end gap-3 pt-2 md:pt-7">
+            <div className="text-xs text-gray-500 hidden md:block">
+              Bônus total (preview): <span className="font-semibold text-gray-800">R$ {fmtBR(calculations.totalBonus)}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        
-        {/* Period Settings */}
-        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
-               <Calendar size={20} className="text-gray-500"/>
-               Configurações do Período
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mês de Referência</label>
-                  <input
-                    type="text"
-                    name="currentMonth"
-                    value={localData.currentMonth}
-                    onChange={handleTextChange}
-                    className={baseInputClasses}
-                    placeholder="Ex: Fevereiro 2026"
-                  />
-                </div>
-                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Dias Restantes</label>
-                   <input
-                    type="number"
-                    name="daysRemaining"
-                    value={localData.daysRemaining}
-                    onChange={handleGenericChange}
-                    className={baseInputClasses}
-                  />
-                </div>
-            </div>
-        </div>
+      {/* Metas 01 e 02 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Meta 01 */}
+        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5 md:p-6">
+          <h3 className="text-lg font-bold text-orange-700">Meta 01: Volume de Vendas</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* Sales Section */}
-          <div className="bg-orange-50 p-6 rounded-xl border border-orange-100">
-            <h3 className="font-bold text-brand-orange mb-4 flex items-center gap-2 text-lg">
-              Meta 01: Volume de Vendas
-            </h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Realizado</label>
-                    <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0.000"
-                    value={localData.currentSales === 0 ? '' : formatQuantity(localData.currentSales)}
-                    onChange={(e) => handleQuantityChange(e, 'currentSales')}
-                    className={baseInputClasses}
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Meta (Qtd)</label>
-                    <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0.000"
-                    value={localData.targetSales === 0 ? '' : formatQuantity(localData.targetSales)}
-                    onChange={(e) => handleQuantityChange(e, 'targetSales')}
-                    className={baseInputClasses}
-                    />
-                </div>
-              </div>
-              
-              <div className="pt-4 border-t border-orange-200">
-                 <label className="block text-xs font-bold text-orange-800 uppercase mb-1 flex items-center gap-1">
-                    <DollarSign size={12}/> Valor do Bônus (Se atingido)
-                 </label>
-                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="00,00"
-                    value={localData.bonusValueSales === 0 ? '' : formatCurrency(localData.bonusValueSales)}
-                    onChange={(e) => handleCurrencyChange(e, 'bonusValueSales')}
-                    className={currencyInputClasses}
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="text-xs font-semibold text-orange-700/80">REALIZADO</label>
+              <input
+                value={m1Current}
+                onChange={(e) => setM1Current(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-orange-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-orange-700/80">META (QTD)</label>
+              <input
+                value={m1Target}
+                onChange={(e) => setM1Target(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-orange-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="numeric"
+              />
             </div>
           </div>
 
-          {/* Ticket Section */}
-          <div className="bg-green-50 p-6 rounded-xl border border-green-100">
-            <h3 className="font-bold text-green-700 mb-4 flex items-center gap-2 text-lg">
-              Meta 02: Ticket Médio
-            </h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Atual</label>
-                    <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="00,00"
-                        value={localData.currentTicket === 0 ? '' : formatCurrency(localData.currentTicket)}
-                        onChange={(e) => handleCurrencyChange(e, 'currentTicket')}
-                        className={currencyInputClasses}
-                    />
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Meta</label>
-                    <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="00,00"
-                        value={localData.targetTicket === 0 ? '' : formatCurrency(localData.targetTicket)}
-                        onChange={(e) => handleCurrencyChange(e, 'targetTicket')}
-                        className={currencyInputClasses}
-                    />
-                    </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-green-200">
-                 <label className="block text-xs font-bold text-green-800 uppercase mb-1 flex items-center gap-1">
-                    <DollarSign size={12}/> Valor do Bônus (Se atingido)
-                 </label>
-                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="00,00"
-                    value={localData.bonusValueTicket === 0 ? '' : formatCurrency(localData.bonusValueTicket)}
-                    onChange={(e) => handleCurrencyChange(e, 'bonusValueTicket')}
-                    className={currencyInputClasses}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Revenue Section */}
-          <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 md:col-span-2">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
-              Meta 03: Faturamento Bruto (Escalonado)
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Faturamento Atual</label>
-                <div className="relative">
-                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none">R$</span>
-                   <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="00,00"
-                    value={localData.currentRevenue === 0 ? '' : formatCurrency(localData.currentRevenue)}
-                    onChange={(e) => handleCurrencyChange(e, 'currentRevenue')}
-                    className={currencyInputClasses}
-                  />
-                </div>
-              </div>
-               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Equipe (Qtd Pessoas)</label>
-                <input
-                  type="number"
-                  name="teamSize"
-                  value={localData.teamSize}
-                  onChange={handleGenericChange}
-                  className={baseInputClasses}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4 border-t pt-4">
-                <p className="text-sm font-bold text-gray-700">Configuração dos Níveis</p>
-                
-                {/* Tier 1 */}
-                <div className="grid grid-cols-2 gap-4 items-center">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Meta Nível 1 (Bronze)</label>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatCurrency(localData.targetRevenueTier1)}
-                            disabled
-                            className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 text-sm font-medium" 
-                        />
-                    </div>
-                     <div>
-                        <label className="block text-xs text-gray-500 mb-1">Bônus Nível 1</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none text-xs">R$</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localData.bonusValueRevenueT1 === 0 ? '' : formatCurrency(localData.bonusValueRevenueT1)}
-                                onChange={(e) => handleCurrencyChange(e, 'bonusValueRevenueT1')}
-                                className={`${currencyInputClasses} py-1 text-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tier 2 */}
-                <div className="grid grid-cols-2 gap-4 items-center">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Meta Nível 2 (Prata)</label>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatCurrency(localData.targetRevenueTier2)}
-                            disabled
-                             className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 text-sm font-medium" 
-                        />
-                    </div>
-                     <div>
-                        <label className="block text-xs text-gray-500 mb-1">Bônus Nível 2</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none text-xs">R$</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localData.bonusValueRevenueT2 === 0 ? '' : formatCurrency(localData.bonusValueRevenueT2)}
-                                onChange={(e) => handleCurrencyChange(e, 'bonusValueRevenueT2')}
-                                className={`${currencyInputClasses} py-1 text-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                 {/* Tier 3 */}
-                 <div className="grid grid-cols-2 gap-4 items-center">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Meta Nível 3 (Ouro)</label>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={formatCurrency(localData.targetRevenueTier3)}
-                            disabled
-                            className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 text-sm font-medium" 
-                        />
-                    </div>
-                     <div>
-                        <label className="block text-xs text-gray-500 mb-1">Bônus Nível 3</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-lime font-bold pointer-events-none text-xs">R$</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={localData.bonusValueRevenueT3 === 0 ? '' : formatCurrency(localData.bonusValueRevenueT3)}
-                                onChange={(e) => handleCurrencyChange(e, 'bonusValueRevenueT3')}
-                                className={`${currencyInputClasses} py-1 text-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+          <div className="mt-4 pt-4 border-t border-orange-100">
+            <label className="text-xs font-semibold text-orange-700/80">
+              $ VALOR DO BÔNUS (SE ATINGIDO) <span className="ml-2 text-xs text-orange-700/60">({preview.m1pct.toFixed(1)}% atingido)</span>
+            </label>
+            <input
+              value={m1Bonus}
+              onChange={(e) => setM1Bonus(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-orange-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+              inputMode="decimal"
+            />
           </div>
         </div>
 
-        <div className="flex flex-col-reverse md:flex-row justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white/90 backdrop-blur pb-4">
+        {/* Meta 02 */}
+        <div className="bg-green-50 border border-green-100 rounded-2xl p-5 md:p-6">
+          <h3 className="text-lg font-bold text-green-700">Meta 02: Ticket Médio</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="text-xs font-semibold text-green-700/80">ATUAL</label>
+              <input
+                value={m2Current}
+                onChange={(e) => setM2Current(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-green-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+                inputMode="decimal"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-green-700/80">META</label>
+              <input
+                value={m2Target}
+                onChange={(e) => setM2Target(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-green-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+                inputMode="decimal"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-green-100">
+            <label className="text-xs font-semibold text-green-700/80">
+              $ VALOR DO BÔNUS (SE ATINGIDO){' '}
+              <span className="ml-2 text-xs text-green-700/60">
+                ({preview.m2ok ? 'atingida ✅' : 'não atingida'})
+              </span>
+            </label>
+            <input
+              value={m2Bonus}
+              onChange={(e) => setM2Bonus(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-green-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+              inputMode="decimal"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Meta 03 */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6">
+        <h3 className="text-lg font-bold text-gray-900">Meta 03: Faturamento Bruto (Escalonado)</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-600">FATURAMENTO ATUAL</label>
+            <input
+              value={m3RevenueCurrent}
+              onChange={(e) => setM3RevenueCurrent(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+              inputMode="decimal"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600">EQUIPE (QTD PESSOAS)</label>
+            <input
+              value={m3TeamSize}
+              onChange={(e) => setM3TeamSize(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+              inputMode="numeric"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-200">
+          <div className="text-sm font-semibold text-gray-800 mb-4">Configuração dos Níveis</div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Nível 1 */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600">Meta Nível 1 (Bronze)</label>
+              <input
+                value={lvl1Target}
+                onChange={(e) => setLvl1Target(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="decimal"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600">Bônus Nível 1</label>
+              <input
+                value={lvl1Bonus}
+                onChange={(e) => setLvl1Bonus(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="decimal"
+              />
+            </div>
+
+            {/* Nível 2 */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600">Meta Nível 2 (Prata)</label>
+              <input
+                value={lvl2Target}
+                onChange={(e) => setLvl2Target(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="decimal"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600">Bônus Nível 2</label>
+              <input
+                value={lvl2Bonus}
+                onChange={(e) => setLvl2Bonus(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="decimal"
+              />
+            </div>
+
+            {/* Nível 3 */}
+            <div>
+              <label className="text-xs font-semibold text-gray-600">Meta Nível 3 (Ouro)</label>
+              <input
+                value={lvl3Target}
+                onChange={(e) => setLvl3Target(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="decimal"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600">Bônus Nível 3</label>
+              <input
+                value={lvl3Bonus}
+                onChange={(e) => setLvl3Bonus(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:ring-2 focus:ring-orange-200"
+                inputMode="decimal"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 text-xs text-gray-500">
+            Nível atingido (preview): <span className="font-semibold text-gray-800">{preview.lvl}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 flex items-center justify-between gap-4">
           <button
-            type="button"
             onClick={handleReset}
-            className="flex justify-center items-center gap-2 px-6 py-3 md:py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition w-full md:w-auto border md:border-none border-gray-200"
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
           >
-            <RotateCcw size={18} />
-            Restaurar Padrões
+            ↺ Restaurar Padrões
           </button>
+
           <button
-            type="submit"
-            className="flex justify-center items-center gap-2 px-8 py-3 md:py-2 bg-brand-orange text-white rounded-lg hover:bg-orange-600 shadow-lg shadow-orange-200 transition transform hover:-translate-y-0.5 w-full md:w-auto font-bold"
+            onClick={handleSave}
+            className="px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm"
           >
-            <Save size={18} />
             Salvar Configurações
           </button>
         </div>
-      </form>
+      </div>
+
+      {/* Rodapé preview */}
+      <div className="text-xs text-gray-500">
+        Dica: depois de salvar, atualize a página (Ctrl+F5) para garantir cache limpo no GitHub Pages.
+      </div>
     </div>
   );
 };
