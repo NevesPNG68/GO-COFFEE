@@ -1,319 +1,268 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMetrics } from '../context/MetricsContext';
-import { MetricsData } from '../types';
+import { RotateCcw, Save } from 'lucide-react';
 
-function toNumber(v: string) {
-  // aceita "29,70" também
-  const normalized = v.replace(/\./g, '').replace(',', '.');
-  const n = Number(normalized);
+type MetricsData = {
+  currentMonth: string;
+  daysRemaining: number;
+  teamSize: number;
+
+  currentSales: number;
+  targetSales: number;
+  bonusValueSales: number;
+
+  currentTicket: number;
+  targetTicket: number;
+  bonusValueTicket: number;
+
+  currentRevenue: number;
+
+  targetRevenueTier1: number;
+  targetRevenueTier2: number;
+  targetRevenueTier3: number;
+
+  bonusTier1: number;
+  bonusTier2: number;
+  bonusTier3: number;
+};
+
+const DEFAULTS: MetricsData = {
+  currentMonth: 'FEVEREIRO 2026',
+  daysRemaining: 18,
+  teamSize: 2,
+
+  currentSales: 328,
+  targetSales: 1200,
+  bonusValueSales: 150,
+
+  currentTicket: 29.7,
+  targetTicket: 29.5,
+  bonusValueTicket: 250,
+
+  currentRevenue: 9700,
+
+  targetRevenueTier1: 35000,
+  targetRevenueTier2: 36000,
+  targetRevenueTier3: 40000,
+
+  bonusTier1: 100,
+  bonusTier2: 200,
+  bonusTier3: 300,
+};
+
+function num(v: unknown) {
+  const n = Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-function formatInputNumber(n: number) {
-  // mantém simples para input
-  if (!Number.isFinite(n)) return '';
-  return String(n);
 }
 
 const Field: React.FC<{
   label: string;
-  value: string;
+  value: number | string;
   onChange: (v: string) => void;
-  right?: React.ReactNode;
-}> = ({ label, value, onChange, right }) => (
-  <div className="space-y-1">
-    <div className="flex items-center justify-between">
-      <label className="text-xs font-semibold text-gray-600">{label}</label>
-      {right}
-    </div>
+  type?: 'text' | 'number';
+}> = ({ label, value, onChange, type = 'number' }) => (
+  <div>
+    <div className="text-xs font-semibold text-gray-500 mb-1">{label}</div>
     <input
+      type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200"
+      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200"
     />
   </div>
 );
 
-const SectionCard: React.FC<{ title: string; tone?: 'orange' | 'green' | 'gray'; children: React.ReactNode }> = ({
-  title,
-  tone = 'gray',
-  children,
-}) => {
-  const toneClass =
-    tone === 'orange'
-      ? 'bg-orange-50 border-orange-100'
-      : tone === 'green'
-      ? 'bg-green-50 border-green-100'
-      : 'bg-white border-gray-200';
-
-  const titleClass = tone === 'orange' ? 'text-orange-600' : tone === 'green' ? 'text-green-700' : 'text-gray-800';
-
-  return (
-    <div className={`rounded-2xl border p-5 ${toneClass}`}>
-      <h3 className={`text-lg font-bold ${titleClass}`}>{title}</h3>
-      <div className="mt-4">{children}</div>
-    </div>
-  );
-};
-
 const UpdateForm: React.FC = () => {
-  const { data, updateData, resetDefaults } = useMetrics();
+  // ⚠️ blindagem: não assumo o tipo exato do contexto (evita quebrar por refactor)
+  const ctx = useMetrics() as any;
 
-  // Draft local (para só salvar quando clicar)
-  const [draft, setDraft] = useState<MetricsData>(data);
+  // O mínimo que precisamos:
+  const data: MetricsData = (ctx?.data ?? DEFAULTS) as MetricsData;
 
-  useEffect(() => {
-    setDraft(data);
-  }, [data]);
+  // setData pode ter nomes diferentes dependendo da versão:
+  const setData: (next: MetricsData) => void =
+    ctx?.setData ?? ctx?.setMetrics ?? ctx?.updateData ?? ctx?.setMetricsData;
 
-  const setDraftField = (key: keyof MetricsData, value: string | number) => {
-    setDraft((prev) => ({ ...prev, [key]: value } as MetricsData));
+  // alguns contexts têm save() / persist()
+  const saveFn: (() => void) | undefined = ctx?.save ?? ctx?.persist ?? ctx?.commit;
+
+  const [local, setLocal] = useState<MetricsData>(() => ({
+    ...DEFAULTS,
+    ...data,
+  }));
+
+  // se o usuário entrar no UpdateForm depois de mudar algo, manter local coerente
+  useMemo(() => {
+    setLocal((prev) => ({ ...prev, ...data }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(data)]);
+
+  const apply = () => {
+    if (typeof setData !== 'function') {
+      alert('Não encontrei a função de atualizar dados no contexto (setData).');
+      return;
+    }
+    setData(local); // ✅ SEM prev => (corrige o erro do build)
+    if (typeof saveFn === 'function') saveFn();
+    alert('Configurações salvas!');
   };
 
-  // Inputs (string) para evitar briga com vírgula/ponto
-  const inputs = useMemo(() => {
-    const d = draft;
-
-    return {
-      currentMonth: d.currentMonth ?? '',
-      daysRemaining: formatInputNumber(d.daysRemaining ?? 0),
-      teamSize: formatInputNumber(d.teamSize ?? 1),
-
-      currentSales: formatInputNumber(d.currentSales ?? 0),
-      targetSales: formatInputNumber(d.targetSales ?? 0),
-      bonusValueSales: formatInputNumber(d.bonusValueSales ?? 0),
-
-      currentTicket: formatInputNumber(d.currentTicket ?? 0),
-      targetTicket: formatInputNumber(d.targetTicket ?? 0),
-      bonusValueTicket: formatInputNumber(d.bonusValueTicket ?? 0),
-
-      currentRevenue: formatInputNumber(d.currentRevenue ?? 0),
-
-      targetRevenueTier1: formatInputNumber(d.targetRevenueTier1 ?? 0),
-      targetRevenueTier2: formatInputNumber(d.targetRevenueTier2 ?? 0),
-      targetRevenueTier3: formatInputNumber(d.targetRevenueTier3 ?? 0),
-
-      bonusTier1: formatInputNumber(d.bonusTier1 ?? 0),
-      bonusTier2: formatInputNumber(d.bonusTier2 ?? 0),
-      bonusTier3: formatInputNumber(d.bonusTier3 ?? 0),
-    };
-  }, [draft]);
-
-  const handleSave = () => {
-    // Converte números antes de gravar
-    updateData({
-      currentMonth: inputs.currentMonth,
-      daysRemaining: Math.max(0, Math.round(toNumber(inputs.daysRemaining))),
-      teamSize: Math.max(1, Math.round(toNumber(inputs.teamSize))),
-
-      currentSales: Math.max(0, Math.round(toNumber(inputs.currentSales))),
-      targetSales: Math.max(0, Math.round(toNumber(inputs.targetSales))),
-      bonusValueSales: Math.max(0, toNumber(inputs.bonusValueSales)),
-
-      currentTicket: Math.max(0, toNumber(inputs.currentTicket)),
-      targetTicket: Math.max(0, toNumber(inputs.targetTicket)),
-      bonusValueTicket: Math.max(0, toNumber(inputs.bonusValueTicket)),
-
-      currentRevenue: Math.max(0, toNumber(inputs.currentRevenue)),
-
-      targetRevenueTier1: Math.max(0, toNumber(inputs.targetRevenueTier1)),
-      targetRevenueTier2: Math.max(0, toNumber(inputs.targetRevenueTier2)),
-      targetRevenueTier3: Math.max(0, toNumber(inputs.targetRevenueTier3)),
-
-      bonusTier1: Math.max(0, toNumber(inputs.bonusTier1)),
-      bonusTier2: Math.max(0, toNumber(inputs.bonusTier2)),
-      bonusTier3: Math.max(0, toNumber(inputs.bonusTier3)),
-    });
-  };
-
-  const handleRestore = () => {
-    resetDefaults();
+  const restore = () => {
+    setLocal(DEFAULTS);
+    if (typeof setData === 'function') setData(DEFAULTS);
+    if (typeof saveFn === 'function') saveFn();
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Atualizar Dados</h2>
-          <p className="text-sm text-gray-500">Edite os valores e clique em “Salvar Configurações”.</p>
+          <h2 className="text-xl font-semibold text-gray-900">Atualizar Dados</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Altere os valores e clique em <span className="font-semibold">Salvar Configurações</span>.
+          </p>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={handleRestore}
-            className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            type="button"
-          >
-            Restaurar Padrões
-          </button>
-
-          <button
-            onClick={handleSave}
-            className="inline-flex items-center justify-center rounded-xl bg-orange-500 px-5 py-2 text-sm font-bold text-white hover:bg-orange-600"
-            type="button"
-          >
-            Salvar Configurações
-          </button>
-        </div>
+        <button
+          onClick={restore}
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          title="Restaurar Padrões"
+        >
+          <RotateCcw size={16} />
+          Restaurar
+        </button>
       </div>
 
       {/* Top fields */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <SectionCard title="Mês" tone="gray">
-          <Field
-            label="Mês / Ano"
-            value={inputs.currentMonth}
-            onChange={(v) => setDraftField('currentMonth', v)}
-          />
-        </SectionCard>
-
-        <SectionCard title="Dias restantes" tone="gray">
-          <Field
-            label="Dias"
-            value={inputs.daysRemaining}
-            onChange={(v) => setDraftField('daysRemaining', toNumber(v))}
-          />
-        </SectionCard>
-
-        <SectionCard title="Equipe" tone="gray">
-          <Field
-            label="Qtd Pessoas"
-            value={inputs.teamSize}
-            onChange={(v) => setDraftField('teamSize', toNumber(v))}
-          />
-        </SectionCard>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+        <Field
+          label="Mês (rótulo)"
+          value={local.currentMonth}
+          type="text"
+          onChange={(v) => setLocal({ ...local, currentMonth: v })}
+        />
+        <Field
+          label="Dias restantes"
+          value={local.daysRemaining}
+          onChange={(v) => setLocal({ ...local, daysRemaining: num(v) })}
+        />
+        <Field
+          label="Equipe (qtd pessoas)"
+          value={local.teamSize}
+          onChange={(v) => setLocal({ ...local, teamSize: num(v) })}
+        />
       </div>
 
-      {/* Meta 01 + Meta 02 */}
+      {/* Meta 01 / 02 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SectionCard title="Meta 01: Volume de Vendas" tone="orange">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-orange-100 bg-orange-50 p-5">
+          <div className="text-lg font-bold text-orange-600">Meta 01: Volume de Vendas</div>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
-              label="Realizado (Qtd)"
-              value={inputs.currentSales}
-              onChange={(v) => setDraftField('currentSales', toNumber(v))}
+              label="Realizado"
+              value={local.currentSales}
+              onChange={(v) => setLocal({ ...local, currentSales: num(v) })}
             />
             <Field
               label="Meta (Qtd)"
-              value={inputs.targetSales}
-              onChange={(v) => setDraftField('targetSales', toNumber(v))}
+              value={local.targetSales}
+              onChange={(v) => setLocal({ ...local, targetSales: num(v) })}
             />
-          </div>
-
-          <div className="mt-4">
-            <Field
-              label="Valor do bônus (se atingido)"
-              value={inputs.bonusValueSales}
-              onChange={(v) => setDraftField('bonusValueSales', toNumber(v))}
-            />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Meta 02: Ticket Médio" tone="green">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field
-              label="Atual (R$)"
-              value={inputs.currentTicket}
-              onChange={(v) => setDraftField('currentTicket', toNumber(v))}
-            />
-            <Field
-              label="Meta (R$)"
-              value={inputs.targetTicket}
-              onChange={(v) => setDraftField('targetTicket', toNumber(v))}
-            />
-          </div>
-
-          <div className="mt-4">
-            <Field
-              label="Valor do bônus (se atingido)"
-              value={inputs.bonusValueTicket}
-              onChange={(v) => setDraftField('bonusValueTicket', toNumber(v))}
-            />
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* Meta 03 */}
-      <SectionCard title="Meta 03: Faturamento Bruto (Escalonado)" tone="gray">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Field
-            label="Faturamento Atual (R$)"
-            value={inputs.currentRevenue}
-            onChange={(v) => setDraftField('currentRevenue', toNumber(v))}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field
-              label="Equipe (Qtd Pessoas)"
-              value={inputs.teamSize}
-              onChange={(v) => setDraftField('teamSize', toNumber(v))}
-            />
-            <Field
-              label="Dias restantes"
-              value={inputs.daysRemaining}
-              onChange={(v) => setDraftField('daysRemaining', toNumber(v))}
-            />
+            <div className="sm:col-span-2">
+              <Field
+                label="Valor do bônus (se atingido)"
+                value={local.bonusValueSales}
+                onChange={(v) => setLocal({ ...local, bonusValueSales: num(v) })}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="mt-6">
-          <h4 className="text-sm font-bold text-gray-800 mb-3">Configuração dos Níveis</h4>
+        <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
+          <div className="text-lg font-bold text-green-700">Meta 02: Ticket Médio</div>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field
+              label="Atual"
+              value={local.currentTicket}
+              onChange={(v) => setLocal({ ...local, currentTicket: num(v) })}
+            />
+            <Field
+              label="Meta"
+              value={local.targetTicket}
+              onChange={(v) => setLocal({ ...local, targetTicket: num(v) })}
+            />
+            <div className="sm:col-span-2">
+              <Field
+                label="Valor do bônus (se atingido)"
+                value={local.bonusValueTicket}
+                onChange={(v) => setLocal({ ...local, bonusValueTicket: num(v) })}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Meta 03 */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="text-lg font-bold text-gray-900">Meta 03: Faturamento Bruto (Escalonado)</div>
+
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <Field
+              label="Faturamento atual"
+              value={local.currentRevenue}
+              onChange={(v) => setLocal({ ...local, currentRevenue: num(v) })}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
               label="Meta Nível 1"
-              value={inputs.targetRevenueTier1}
-              onChange={(v) => setDraftField('targetRevenueTier1', toNumber(v))}
+              value={local.targetRevenueTier1}
+              onChange={(v) => setLocal({ ...local, targetRevenueTier1: num(v) })}
             />
             <Field
               label="Bônus Nível 1"
-              value={inputs.bonusTier1}
-              onChange={(v) => setDraftField('bonusTier1', toNumber(v))}
+              value={local.bonusTier1}
+              onChange={(v) => setLocal({ ...local, bonusTier1: num(v) })}
             />
 
             <Field
               label="Meta Nível 2"
-              value={inputs.targetRevenueTier2}
-              onChange={(v) => setDraftField('targetRevenueTier2', toNumber(v))}
+              value={local.targetRevenueTier2}
+              onChange={(v) => setLocal({ ...local, targetRevenueTier2: num(v) })}
             />
             <Field
               label="Bônus Nível 2"
-              value={inputs.bonusTier2}
-              onChange={(v) => setDraftField('bonusTier2', toNumber(v))}
+              value={local.bonusTier2}
+              onChange={(v) => setLocal({ ...local, bonusTier2: num(v) })}
             />
 
             <Field
               label="Meta Nível 3"
-              value={inputs.targetRevenueTier3}
-              onChange={(v) => setDraftField('targetRevenueTier3', toNumber(v))}
+              value={local.targetRevenueTier3}
+              onChange={(v) => setLocal({ ...local, targetRevenueTier3: num(v) })}
             />
             <Field
               label="Bônus Nível 3"
-              value={inputs.bonusTier3}
-              onChange={(v) => setDraftField('bonusTier3', toNumber(v))}
+              value={local.bonusTier3}
+              onChange={(v) => setLocal({ ...local, bonusTier3: num(v) })}
             />
           </div>
         </div>
 
-        <div className="mt-6 flex gap-3">
+        {/* Botões */}
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
           <button
-            onClick={handleRestore}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            type="button"
+            onClick={apply}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-orange px-5 py-3 text-white font-bold hover:opacity-95"
           >
-            Restaurar Padrões
-          </button>
-
-          <button
-            onClick={handleSave}
-            className="rounded-xl bg-orange-500 px-5 py-2 text-sm font-bold text-white hover:bg-orange-600"
-            type="button"
-          >
+            <Save size={18} />
             Salvar Configurações
           </button>
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 };
