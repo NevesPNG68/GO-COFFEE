@@ -1,240 +1,282 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useMetrics } from '../context/MetricsContext';
-import SalesChart from '../components/SalesChart';
-import { 
-  TrendingUp, 
-  Target, 
-  Lock, 
-  Unlock, 
-  DollarSign, 
-  Users, 
-  AlertCircle,
-  Trophy
-} from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-const Dashboard: React.FC = () => {
-  const { data, calculations } = useMetrics();
+function moneyBR(v: number) {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
+function pct(a: number, b: number) {
+  if (!b || b <= 0) return 0;
+  const p = (a / b) * 100;
+  return Math.max(0, p);
+}
 
-  const remainingSales = Math.max(0, data.targetSales - data.currentSales);
-  
-  // Calculate daily needed
-  const salesNeededPerDay = data.daysRemaining > 0 ? Math.ceil(remainingSales / data.daysRemaining) : remainingSales;
-  const revenueNeededPerDay = data.daysRemaining > 0 ? (data.targetRevenueTier3 - data.currentRevenue) / data.daysRemaining : 0;
+function clampPct(v: number) {
+  return Math.min(100, Math.max(0, v));
+}
 
-  const renderRevenueProgress = (tierLabel: string, target: number, reward: number, current: number) => {
-    const percent = Math.min(100, (current / target) * 100);
-    const isHit = current >= target;
+const ProgressBar: React.FC<{ value: number }> = ({ value }) => {
+  const p = clampPct(value);
+  return (
+    <div className="w-full h-2 rounded-full bg-black/10 overflow-hidden">
+      <div className="h-full bg-brand-orange" style={{ width: `${p}%` }} />
+    </div>
+  );
+};
 
-    return (
-      <div className="mb-4 last:mb-0">
-        <div className="flex justify-between items-end mb-1">
-          <div>
-            <span className="text-xs font-bold text-gray-600 block">{tierLabel}</span>
-            <span className="text-[10px] text-gray-400">Meta: {formatCurrency(target)}</span>
-          </div>
-          <div className="text-right">
-             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isHit ? 'bg-brand-orange text-white' : 'bg-gray-100 text-gray-500'}`}>
-               Prêmio: {formatCurrency(reward)}
-             </span>
-          </div>
-        </div>
-        <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all duration-1000 ${isHit ? 'bg-brand-orange' : 'bg-gray-300'}`}
-            style={{ width: `${percent}%` }}
-          ></div>
-        </div>
-      </div>
-    )
-  };
+const Card: React.FC<{ title: string; tone?: 'orange' | 'green' | 'white'; children: React.ReactNode }> = ({
+  title,
+  tone = 'white',
+  children,
+}) => {
+  const wrap =
+    tone === 'orange'
+      ? 'bg-orange-50 border-orange-100'
+      : tone === 'green'
+      ? 'bg-green-50 border-green-100'
+      : 'bg-white border-gray-200';
+
+  const titleColor =
+    tone === 'orange' ? 'text-orange-600' : tone === 'green' ? 'text-green-700' : 'text-gray-900';
 
   return (
-    <div className="space-y-6 md:space-y-8 pb-12">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-brand-black to-gray-800 rounded-2xl p-5 md:p-8 text-white shadow-2xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-brand-orange px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider">{data.currentMonth}</span>
-              <div className="flex items-center gap-1 border border-white/20 px-2 py-0.5 rounded-full bg-white/5">
-                <span className="font-bold text-white text-[10px]">go</span>
-                <span className="text-[10px] text-white">coffee</span>
-              </div>
-            </div>
-            <h1 className="text-3xl md:text-5xl font-black uppercase leading-tight">
-              Rumo ao <span className="text-brand-orange">Sucesso!</span>
-            </h1>
-            <p className="mt-2 text-gray-300 max-w-lg text-sm md:text-base">
-              Acompanhe suas métricas e conquiste o bônus máximo.
-            </p>
-          </div>
-          
-          <div className="flex flex-col gap-3 w-full md:w-auto">
-             {/* Box 1: Earned */}
-             <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20 w-full md:min-w-[280px]">
-                <p className="text-gray-300 text-xs md:text-sm font-medium mb-1">Bônus Individual Conquistado</p>
-                <div className="text-3xl md:text-4xl font-bold text-brand-green flex items-center gap-1">
-                   {formatCurrency(calculations.totalIndividual)}
-                </div>
-             </div>
-             
-             {/* Box 2: Potential */}
-             <div className="bg-brand-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 w-full md:min-w-[280px] flex justify-between items-center">
-                <span className="text-gray-400 text-xs uppercase font-bold tracking-wider">Potencial Máximo</span>
-                <span className="text-lg font-bold text-brand-orange">{formatCurrency(calculations.maxPotentialIndividual)}</span>
-             </div>
+    <div className={`rounded-2xl border p-5 ${wrap}`}>
+      <div className={`text-lg font-bold ${titleColor}`}>{title}</div>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+};
+
+const Dashboard: React.FC = () => {
+  const { data } = useMetrics();
+
+  const {
+    currentMonth,
+    daysRemaining,
+    teamSize,
+
+    currentSales,
+    targetSales,
+    bonusValueSales,
+
+    currentTicket,
+    targetTicket,
+    bonusValueTicket,
+
+    currentRevenue,
+
+    targetRevenueTier1,
+    targetRevenueTier2,
+    targetRevenueTier3,
+
+    bonusTier1,
+    bonusTier2,
+    bonusTier3,
+  } = data;
+
+  // ===== Cálculos (tudo aqui dentro, sem "calculations") =====
+  const salesPct = useMemo(() => pct(currentSales, targetSales), [currentSales, targetSales]);
+  const ticketPct = useMemo(() => pct(currentTicket, targetTicket), [currentTicket, targetTicket]);
+
+  const revenuePctT1 = useMemo(() => pct(currentRevenue, targetRevenueTier1), [currentRevenue, targetRevenueTier1]);
+  const revenuePctT2 = useMemo(() => pct(currentRevenue, targetRevenueTier2), [currentRevenue, targetRevenueTier2]);
+  const revenuePctT3 = useMemo(() => pct(currentRevenue, targetRevenueTier3), [currentRevenue, targetRevenueTier3]);
+
+  const salesHit = targetSales > 0 && currentSales >= targetSales;
+  const ticketHit = targetTicket > 0 && currentTicket >= targetTicket;
+
+  const achievedTier = useMemo(() => {
+    // maior tier atingido
+    if (targetRevenueTier3 > 0 && currentRevenue >= targetRevenueTier3) return 3;
+    if (targetRevenueTier2 > 0 && currentRevenue >= targetRevenueTier2) return 2;
+    if (targetRevenueTier1 > 0 && currentRevenue >= targetRevenueTier1) return 1;
+    return 0;
+  }, [currentRevenue, targetRevenueTier1, targetRevenueTier2, targetRevenueTier3]);
+
+  const tierBonusPerPerson = useMemo(() => {
+    if (achievedTier === 3) return bonusTier3 || 0;
+    if (achievedTier === 2) return bonusTier2 || 0;
+    if (achievedTier === 1) return bonusTier1 || 0;
+    return 0;
+  }, [achievedTier, bonusTier1, bonusTier2, bonusTier3]);
+
+  const team = Math.max(1, Number(teamSize) || 1);
+
+  const bonusSalesEarned = salesHit ? Number(bonusValueSales) || 0 : 0;
+  const bonusTicketEarned = ticketHit ? Number(bonusValueTicket) || 0 : 0;
+  const bonusRevenueTotal = tierBonusPerPerson * team;
+
+  const totalBonus = bonusSalesEarned + bonusTicketEarned + bonusRevenueTotal;
+
+  const statusMsg = useMemo(() => {
+    const parts: string[] = [];
+    if (!salesHit) parts.push('Meta de Volume ainda não atingida.');
+    else parts.push('Volume atingido.');
+
+    if (!ticketHit) parts.push('Ticket abaixo da meta.');
+    else parts.push('Ticket atingido.');
+
+    if (achievedTier === 0) parts.push('Faturamento ainda não bateu nenhum nível.');
+    else parts.push(`Faturamento atingiu Nível ${achievedTier}.`);
+
+    return parts.join(' ');
+  }, [salesHit, ticketHit, achievedTier]);
+
+  return (
+    <div className="space-y-6">
+      {/* Top line */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+          <div className="text-sm text-gray-500 mt-1">
+            <span className="font-semibold text-green-700">{currentMonth}</span>
+            {typeof daysRemaining === 'number' ? (
+              <>
+                {' '}
+                • <span className="font-semibold text-green-700">{daysRemaining}</span> dias restantes
+              </>
+            ) : null}
           </div>
         </div>
-        
-        {/* Decorative circle */}
-        <div className="absolute -right-20 -top-40 w-80 h-80 bg-brand-orange/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+          <div className="text-xs font-semibold text-gray-500">Bônus total (se condições atingidas)</div>
+          <div className="text-xl font-extrabold text-gray-900">{moneyBR(totalBonus)}</div>
+          <div className="text-xs text-gray-500 mt-1">
+            (Faturamento escalonado considera equipe: <span className="font-semibold">{team}</span>)
+          </div>
+        </div>
       </div>
 
-      {/* Main KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-        
-        {/* META 1: VOLUME */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 md:p-6 flex flex-col relative">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide">Meta 01</p>
-              <h2 className="text-xl md:text-2xl font-black text-gray-900">Volume de Vendas</h2>
-            </div>
-            <div className="p-2 bg-orange-100 text-brand-orange rounded-lg">
-              <TrendingUp size={20} className="md:w-6 md:h-6" />
-            </div>
-          </div>
-
-          <div className="flex-1 flex flex-col justify-center items-center">
-            <SalesChart current={data.currentSales} target={data.targetSales} />
-            <div className="w-full flex justify-between items-end mt-4 border-t pt-4">
-               <div>
-                  <p className="text-[10px] md:text-xs text-gray-500">Realizado</p>
-                  <p className="text-xl md:text-2xl font-bold text-gray-800">{data.currentSales}</p>
-               </div>
-               <div className="text-right">
-                  <p className="text-[10px] md:text-xs text-gray-500">Meta</p>
-                  <p className="text-xl md:text-2xl font-bold text-gray-400">/ {data.targetSales}</p>
-               </div>
-            </div>
-          </div>
-          
-          <div className="mt-4 flex items-center justify-between gap-2">
-            <div className="bg-orange-50 p-3 rounded-lg flex-1 flex justify-center items-center gap-2">
-               <span className="text-xs font-medium text-gray-700">Faltam:</span>
-               <span className="text-lg font-bold text-brand-orange">{remainingSales}</span>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 p-2 rounded-lg flex flex-col items-center justify-center min-w-[100px]">
-               <span className="text-[10px] uppercase font-bold text-yellow-700 flex items-center gap-1">
-                 <Trophy size={12}/> Prêmio
-               </span>
-               <span className="text-sm font-bold text-gray-800">{formatCurrency(data.bonusValueSales)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* META 2: TICKET MEDIO */}
-        <div className={`rounded-2xl shadow-lg border p-5 md:p-6 flex flex-col relative overflow-hidden ${calculations.isTicketLocked ? 'bg-gray-50 border-gray-200' : 'bg-white border-green-100'}`}>
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div>
-              <p className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide">Meta 02</p>
-              <h2 className="text-xl md:text-2xl font-black text-gray-900">Ticket Médio</h2>
-            </div>
-            <div className={`p-2 rounded-lg ${calculations.isTicketLocked ? 'bg-gray-200 text-gray-500' : 'bg-green-100 text-brand-green'}`}>
-              {calculations.isTicketLocked ? <Lock size={20} className="md:w-6 md:h-6" /> : <Unlock size={20} className="md:w-6 md:h-6" />}
-            </div>
-          </div>
-
-          <div className="flex-1 flex flex-col justify-center items-center relative z-10">
-            <div className={`text-5xl md:text-6xl font-black mb-2 ${data.currentTicket >= data.targetTicket ? 'text-brand-green' : 'text-gray-800'}`}>
-               {data.currentTicket.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace('R$', '')}
-            </div>
-            <p className="text-gray-500 font-medium text-sm md:text-base">Meta: {formatCurrency(data.targetTicket)}</p>
-            
-            <div className="mt-4 bg-white/80 backdrop-blur-sm border border-gray-200 px-4 py-2 rounded-full shadow-sm">
-                <span className="text-xs font-bold text-gray-500 uppercase mr-2">Valor do Prêmio:</span>
-                <span className="text-sm font-black text-green-700">{formatCurrency(data.bonusValueTicket)}</span>
-            </div>
-          </div>
-
-          {calculations.isTicketLocked && (
-             <div className="mt-6 bg-red-50 border border-red-100 p-3 rounded-lg flex items-start gap-3 relative z-10">
-                <AlertCircle className="text-red-500 shrink-0" size={18} />
-                <p className="text-[10px] md:text-xs text-red-600 font-medium leading-snug">
-                  Trava de Segurança: Alcance 1.200 vendas para liberar este bônus.
-                </p>
-             </div>
+      {/* Status */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 flex gap-3 items-start">
+        <div className="mt-0.5">
+          {totalBonus > 0 ? (
+            <CheckCircle2 className="text-green-600" size={20} />
+          ) : (
+            <AlertTriangle className="text-orange-500" size={20} />
           )}
         </div>
+        <div>
+          <div className="font-bold text-gray-900">Status Geral</div>
+          <div className="text-sm text-gray-600 mt-1">{statusMsg}</div>
+        </div>
+      </div>
 
-        {/* META 3: FATURAMENTO */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 md:p-6 flex flex-col">
-          <div className="flex justify-between items-start mb-4">
+      {/* Meta 01 + 02 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card title="Meta 01: Volume de Vendas" tone="orange">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide">Meta 03</p>
-              <h2 className="text-xl md:text-2xl font-black text-gray-900">Faturamento</h2>
+              <div className="text-xs font-semibold text-gray-500">Realizado</div>
+              <div className="text-2xl font-extrabold text-gray-900">{currentSales}</div>
             </div>
-            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-              <DollarSign size={20} className="md:w-6 md:h-6" />
+            <div>
+              <div className="text-xs font-semibold text-gray-500">Meta (Qtd)</div>
+              <div className="text-2xl font-extrabold text-gray-900">{targetSales}</div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <ProgressBar value={salesPct} />
+            <div className="mt-2 text-xs text-gray-600">
+              <span className="font-bold text-brand-orange">{salesPct.toFixed(1)}%</span> do objetivo
+              {salesHit ? (
+                <span className="ml-2 text-green-700 font-semibold">• Bônus: {moneyBR(bonusSalesEarned)}</span>
+              ) : (
+                <span className="ml-2 text-gray-500">• Bônus: {moneyBR(0)}</span>
+              )}
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col justify-start space-y-4">
-            <div className="text-center mb-2">
-               <p className="text-gray-400 text-[10px] md:text-sm font-medium mb-1">Acumulado</p>
-               <h3 className="text-3xl md:text-4xl font-black text-gray-800">{formatCurrency(data.currentRevenue)}</h3>
-            </div>
+          <div className="mt-4 text-sm text-gray-700">
+            <span className="font-semibold">Bônus se atingir:</span> {moneyBR(Number(bonusValueSales) || 0)}
+          </div>
+        </Card>
 
-            {/* Individual Progress Bars for each Tier */}
-            <div className="space-y-1">
-               {renderRevenueProgress("Nível 1 (Bronze)", data.targetRevenueTier1, data.bonusValueRevenueT1, data.currentRevenue)}
-               {renderRevenueProgress("Nível 2 (Prata)", data.targetRevenueTier2, data.bonusValueRevenueT2, data.currentRevenue)}
-               {renderRevenueProgress("Nível 3 (Ouro)", data.targetRevenueTier3, data.bonusValueRevenueT3, data.currentRevenue)}
+        <Card title="Meta 02: Ticket Médio" tone="green">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs font-semibold text-gray-500">Atual</div>
+              <div className="text-2xl font-extrabold text-gray-900">{moneyBR(Number(currentTicket) || 0)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-gray-500">Meta</div>
+              <div className="text-2xl font-extrabold text-gray-900">{moneyBR(Number(targetTicket) || 0)}</div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <ProgressBar value={ticketPct} />
+            <div className="mt-2 text-xs text-gray-600">
+              <span className="font-bold text-brand-orange">{ticketPct.toFixed(1)}%</span> do objetivo
+              {ticketHit ? (
+                <span className="ml-2 text-green-700 font-semibold">• Bônus: {moneyBR(bonusTicketEarned)}</span>
+              ) : (
+                <span className="ml-2 text-gray-500">• Bônus: {moneyBR(0)}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 text-sm text-gray-700">
+            <span className="font-semibold">Bônus se atingir:</span> {moneyBR(Number(bonusValueTicket) || 0)}
+          </div>
+        </Card>
+      </div>
+
+      {/* Meta 03 */}
+      <Card title="Meta 03: Faturamento Bruto (Escalonado)">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <div className="text-xs font-semibold text-gray-500">Faturamento atual</div>
+            <div className="text-3xl font-extrabold text-gray-900">{moneyBR(Number(currentRevenue) || 0)}</div>
+
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              <TrendingUp size={18} className="text-brand-orange" />
+              <span>
+                Nível atingido:{' '}
+                <span className="font-bold text-gray-900">{achievedTier === 0 ? 'Nenhum' : `Nível ${achievedTier}`}</span>
+                {' '}• Bônus por pessoa: <span className="font-bold">{moneyBR(tierBonusPerPerson)}</span>
+                {' '}• Total equipe: <span className="font-bold">{moneyBR(bonusRevenueTotal)}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+            <div className="text-sm font-bold text-gray-900 mb-3">Progresso por nível</div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-xs text-gray-600">
+                  <span>Meta Nível 1</span>
+                  <span className="font-semibold">{moneyBR(Number(targetRevenueTier1) || 0)} • {revenuePctT1.toFixed(1)}%</span>
+                </div>
+                <ProgressBar value={revenuePctT1} />
+                <div className="mt-1 text-xs text-gray-500">Bônus: {moneyBR(Number(bonusTier1) || 0)}</div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-xs text-gray-600">
+                  <span>Meta Nível 2</span>
+                  <span className="font-semibold">{moneyBR(Number(targetRevenueTier2) || 0)} • {revenuePctT2.toFixed(1)}%</span>
+                </div>
+                <ProgressBar value={revenuePctT2} />
+                <div className="mt-1 text-xs text-gray-500">Bônus: {moneyBR(Number(bonusTier2) || 0)}</div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-xs text-gray-600">
+                  <span>Meta Nível 3</span>
+                  <span className="font-semibold">{moneyBR(Number(targetRevenueTier3) || 0)} • {revenuePctT3.toFixed(1)}%</span>
+                </div>
+                <ProgressBar value={revenuePctT3} />
+                <div className="mt-1 text-xs text-gray-500">Bônus: {moneyBR(Number(bonusTier3) || 0)}</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Flight Plan / Daily Targets */}
-      <div className="bg-brand-black text-white rounded-2xl p-5 md:p-8 shadow-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 md:mb-8">
-           <div>
-              <p className="text-brand-orange font-bold text-xs md:text-sm tracking-wider uppercase mb-1">Plano de Voo</p>
-              <h2 className="text-2xl md:text-3xl font-black">Meta Diária</h2>
-              <p className="text-gray-400 text-xs md:text-sm mt-2">Baseado em {data.daysRemaining} dias restantes</p>
-           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-           <div className="bg-white/5 border border-white/10 p-4 md:p-5 rounded-xl hover:bg-white/10 transition">
-              <div className="flex items-center gap-3 mb-2">
-                 <Target className="text-brand-orange" size={20} />
-                 <span className="text-gray-300 font-medium text-sm">Vendas por Dia</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-bold">{Math.max(0, salesNeededPerDay)} <span className="text-xs md:text-sm font-normal text-gray-400">vendas</span></p>
-           </div>
-
-           <div className="bg-white/5 border border-white/10 p-4 md:p-5 rounded-xl hover:bg-white/10 transition">
-              <div className="flex items-center gap-3 mb-2">
-                 <DollarSign className="text-brand-orange" size={20} />
-                 <span className="text-gray-300 font-medium text-sm">Faturamento/Dia</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-bold">{formatCurrency(Math.max(0, revenueNeededPerDay))} </p>
-           </div>
-
-           <div className="bg-white/5 border border-white/10 p-4 md:p-5 rounded-xl hover:bg-white/10 transition">
-              <div className="flex items-center gap-3 mb-2">
-                 <Users className="text-brand-orange" size={20} />
-                 <span className="text-gray-300 font-medium text-sm">Ticket Médio</span>
-              </div>
-              <p className="text-2xl md:text-3xl font-bold text-brand-green">Manter {formatCurrency(data.currentTicket)}</p>
-           </div>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 };
