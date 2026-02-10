@@ -1,10 +1,9 @@
-import type { MetricsData } from './types';
-
-export const STORAGE_KEY = 'go-coffee-metrics-v1';
+// constants.ts
+import { MetricsData } from './types';
 
 export const DEFAULT_METRICS: MetricsData = {
-  currentMonth: 'Fevereiro 2026',
-  daysRemaining: 18,
+  currentMonthLabel: 'FEVEREIRO 2026',
+  dayOfMonth: 18,
   teamSize: 2,
 
   currentSales: 328,
@@ -16,12 +15,11 @@ export const DEFAULT_METRICS: MetricsData = {
   bonusValueTicket: 250,
 
   currentRevenue: 9700,
-
   targetRevenueTier1: 35000,
   targetRevenueTier2: 36000,
   targetRevenueTier3: 40000,
-
-  bonusTier1: 100,
-  bonusTier2: 200,
-  bonusTier3: 300,
+  bonusValueRevenueT1: 100,
+  bonusValueRevenueT2: 200,
+  bonusValueRevenueT3: 300,
 };
+
