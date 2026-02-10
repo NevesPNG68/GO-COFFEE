@@ -1,3 +1,4 @@
+<h1>TESTE DASHBOARD 123</h1>
 import React from 'react';
 import { useMetrics } from '../context/MetricsContext';
 import SalesChart from '../components/SalesChart';
