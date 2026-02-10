@@ -26,7 +26,7 @@ const Dashboard: React.FC = () => {
   const revenueNeededPerDay = data.daysRemaining > 0 ? (data.targetRevenueTier3 - data.currentRevenue) / data.daysRemaining : 0;
 
   const renderRevenueProgress = (tierLabel: string, target: number, reward: number, current: number) => {
-    const percent = Math.min(100, (current / target) * 100);
+    const percent = target > 0 ? Math.min(100, (current / target) * 100) : 0;
     const isHit = current >= target;
 
     return (
