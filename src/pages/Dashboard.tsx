@@ -30,7 +30,12 @@ const Dashboard: React.FC = () => {
       ? (data.targetRevenueTier3 - data.currentRevenue) / data.daysRemaining
       : 0;
 
-  const renderRevenueProgress = (tierLabel: string, target: number, reward: number, current: number) => {
+  const renderRevenueProgress = (
+    tierLabel: string,
+    target: number,
+    reward: number,
+    current: number
+  ) => {
     const percent = target > 0 ? Math.min(100, (current / target) * 100) : 0;
     const isHit = current >= target;
 
@@ -51,7 +56,6 @@ const Dashboard: React.FC = () => {
             </span>
           </div>
         </div>
-
         <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-1000 ${
@@ -66,9 +70,9 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 md:space-y-8 pb-12">
-      {/* ✅ TESTE VISUAL (para confirmar que este arquivo é o que está sendo carregado) */}
-      <div className="rounded-xl border-2 border-yellow-400 bg-yellow-200 text-black p-3 font-extrabold text-center">
-        TESTE DASHBOARD 123 — SE VOCÊ ESTÁ VENDO ISSO, ESTE ARQUIVO É O ATIVO ✅
+      {/* ✅ TESTE VISÍVEL (prova de que este arquivo está rodando) */}
+      <div className="rounded-xl border border-yellow-300 bg-yellow-200 text-black px-4 py-3 font-extrabold">
+        TESTE DASHBOARD 123
       </div>
 
       {/* Header Banner */}
@@ -79,17 +83,14 @@ const Dashboard: React.FC = () => {
               <span className="bg-brand-orange px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider">
                 {data.currentMonth}
               </span>
-
               <div className="flex items-center gap-1 border border-white/20 px-2 py-0.5 rounded-full bg-white/5">
                 <span className="font-bold text-white text-[10px]">go</span>
                 <span className="text-[10px] text-white">coffee</span>
               </div>
             </div>
-
             <h1 className="text-3xl md:text-5xl font-black uppercase leading-tight">
               Rumo ao <span className="text-brand-orange">Sucesso!</span>
             </h1>
-
             <p className="mt-2 text-gray-300 max-w-lg text-sm md:text-base">
               Acompanhe suas métricas e conquiste o bônus máximo.
             </p>
@@ -140,7 +141,6 @@ const Dashboard: React.FC = () => {
 
           <div className="flex-1 flex flex-col justify-center items-center">
             <SalesChart current={data.currentSales} target={data.targetSales} />
-
             <div className="w-full flex justify-between items-end mt-4 border-t pt-4">
               <div>
                 <p className="text-[10px] md:text-xs text-gray-500">Realizado</p>
@@ -210,7 +210,9 @@ const Dashboard: React.FC = () => {
             </p>
 
             <div className="mt-4 bg-white/80 backdrop-blur-sm border border-gray-200 px-4 py-2 rounded-full shadow-sm">
-              <span className="text-xs font-bold text-gray-500 uppercase mr-2">Valor do Prêmio:</span>
+              <span className="text-xs font-bold text-gray-500 uppercase mr-2">
+                Valor do Prêmio:
+              </span>
               <span className="text-sm font-black text-green-700">
                 {formatCurrency(data.bonusValueTicket)}
               </span>
@@ -243,7 +245,9 @@ const Dashboard: React.FC = () => {
 
           <div className="flex-1 flex flex-col justify-start space-y-4">
             <div className="text-center mb-2">
-              <p className="text-gray-400 text-[10px] md:text-sm font-medium mb-1">Acumulado</p>
+              <p className="text-gray-400 text-[10px] md:text-sm font-medium mb-1">
+                Acumulado
+              </p>
               <h3 className="text-3xl md:text-4xl font-black text-gray-800">
                 {formatCurrency(data.currentRevenue)}
               </h3>
