@@ -1,54 +1,57 @@
-export type MetricsData = {
-  // topo
-  currentMonth: string;     // ex: "Fevereiro 2026"
-  daysRemaining: number;    // ex: 18
-  teamSize: number;         // ex: 2
+// types.ts
+export type RevenueTier = 0 | 1 | 2 | 3;
 
-  // Meta 01 (Volume)
+export type MetricsData = {
+  // Cabeçalho
+  currentMonthLabel: string; // ex: "Fevereiro 2026"
+  dayOfMonth: number;        // ex: 18
+  teamSize: number;          // qtd pessoas
+
+  // Meta 01 - Volume de Vendas
   currentSales: number;
   targetSales: number;
   bonusValueSales: number;
 
-  // Meta 02 (Ticket)
+  // Meta 02 - Ticket Médio
   currentTicket: number;
   targetTicket: number;
   bonusValueTicket: number;
 
-  // Meta 03 (Faturamento escalonado)
+  // Meta 03 - Faturamento Bruto (Escalonado)
   currentRevenue: number;
   targetRevenueTier1: number;
   targetRevenueTier2: number;
   targetRevenueTier3: number;
-
-  bonusTier1: number;
-  bonusTier2: number;
-  bonusTier3: number;
-
-  // deixa flexível se o Dashboard tiver mais campos
-  [key: string]: any;
+  bonusValueRevenueT1: number;
+  bonusValueRevenueT2: number;
+  bonusValueRevenueT3: number;
 };
 
 export type MetricsCalculations = {
-  achievedSales: boolean;
-  achievedTicket: boolean;
-  achievedRevenueTier: 0 | 1 | 2 | 3;
+  salesPct: number;
+  ticketPct: number;
+  revenuePct: number;
 
-  bonusIndividual: number;
-  totalIndividual: number; // <- ESSA CHAVE É A DO ERRO DO PRINT
-  bonusTeam: number;
-  totalTeam: number;
+  salesDone: boolean;
+  ticketDone: boolean;
 
-  pctSales: number;
-  pctTicket: number;
-  pctRevenue: number;
+  revenueTierAchieved: RevenueTier;
+  revenueDone: boolean;
 
-  [key: string]: any;
+  totalBonusTeam: number;
+  totalBonusIndividual: number;
+
+  gapSales: number;
+  gapTicket: number;
+  gapRevenueToNextTier: number;
 };
 
 export type MetricsContextValue = {
   data: MetricsData;
   calculations: MetricsCalculations;
+
+  // ações
   setData: (next: MetricsData) => void;
-  updateData: (patch: Partial<MetricsData>) => void;
-  reset: () => void;
+  update: (patch: Partial<MetricsData>) => void;
+  resetDefaults: () => void;
 };
