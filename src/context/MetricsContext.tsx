@@ -1,26 +1,26 @@
-import React, { createContext, useContext, useMemo, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 export type MetricsData = {
-  // header
-  currentMonth: string;       // ex: "FEVEREIRO 2026"
-  dayOfMonth: number;         // ex: 10
-  teamSize: number;           // ex: 3
-  daysRemaining: number;      // ex: 19
+  currentMonth: string;        // ex: "Fevereiro 2026"
+  dayOfMonth: number;          // dia do mês
+  teamSize: number;            // qtd pessoas
+  daysRemaining: number;       // dias restantes (campo que estava travando)
 
-  // metas
+  // Meta 01 - volume
   currentSales: number;
   targetSales: number;
   bonusValueSales: number;
 
+  // Meta 02 - ticket
   currentTicket: number;
   targetTicket: number;
   bonusValueTicket: number;
 
+  // Meta 03 - faturamento (3 níveis)
   currentRevenue: number;
   targetRevenueTier1: number;
   targetRevenueTier2: number;
   targetRevenueTier3: number;
-
   bonusValueRevenueT1: number;
   bonusValueRevenueT2: number;
   bonusValueRevenueT3: number;
@@ -28,138 +28,139 @@ export type MetricsData = {
 
 export type MetricsCalculations = {
   isTicketLocked: boolean;
+
+  totalTeam: number;
   totalIndividual: number;
+
+  maxPotentialTeam: number;
   maxPotentialIndividual: number;
 };
 
 type MetricsContextValue = {
   data: MetricsData;
   calculations: MetricsCalculations;
-  updateData: (patch: Partial<MetricsData>) => void;
-  setAllData: (next: MetricsData) => void;
-  reset: () => void;
+
+  setData: React.Dispatch<React.SetStateAction<MetricsData>>;
+  save: () => void;
+  resetDefaults: () => void;
 };
 
 const STORAGE_KEY = 'go-coffee-metrics-v1';
 
 const DEFAULT_DATA: MetricsData = {
-  currentMonth: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(),
-  dayOfMonth: Number(new Date().toLocaleDateString('pt-BR', { day: '2-digit' })),
-  teamSize: 3,
-  daysRemaining: 20,
+  currentMonth: 'Fevereiro 2026',
+  dayOfMonth: 18,
+  teamSize: 2,
+  daysRemaining: 18,
 
-  currentSales: 682,
-  targetSales: 3000,
-  bonusValueSales: 200,
+  currentSales: 328,
+  targetSales: 1200,
+  bonusValueSales: 150,
 
-  currentTicket: 29.23,
-  targetTicket: 32,
-  bonusValueTicket: 200,
+  currentTicket: 29.7,
+  targetTicket: 29.5,
+  bonusValueTicket: 250,
 
-  currentRevenue: 69634.24,
+  currentRevenue: 9700,
   targetRevenueTier1: 35000,
   targetRevenueTier2: 36000,
   targetRevenueTier3: 40000,
-
-  bonusValueRevenueT1: 200,
-  bonusValueRevenueT2: 250,
+  bonusValueRevenueT1: 100,
+  bonusValueRevenueT2: 200,
   bonusValueRevenueT3: 300,
 };
 
 const MetricsContext = createContext<MetricsContextValue | null>(null);
 
-function safeNumber(v: any, fallback = 0) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function loadFromStorage(): MetricsData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_DATA;
-    const parsed = JSON.parse(raw);
-
-    // merge seguro com defaults
-    const merged: MetricsData = { ...DEFAULT_DATA, ...(parsed as Partial<MetricsData>) };
-
-    // garante tipos numéricos
-    return {
-      ...merged,
-      dayOfMonth: safeNumber(merged.dayOfMonth, DEFAULT_DATA.dayOfMonth),
-      teamSize: safeNumber(merged.teamSize, DEFAULT_DATA.teamSize),
-      daysRemaining: safeNumber(merged.daysRemaining, DEFAULT_DATA.daysRemaining),
-
-      currentSales: safeNumber(merged.currentSales),
-      targetSales: safeNumber(merged.targetSales),
-      bonusValueSales: safeNumber(merged.bonusValueSales),
-
-      currentTicket: safeNumber(merged.currentTicket),
-      targetTicket: safeNumber(merged.targetTicket),
-      bonusValueTicket: safeNumber(merged.bonusValueTicket),
-
-      currentRevenue: safeNumber(merged.currentRevenue),
-      targetRevenueTier1: safeNumber(merged.targetRevenueTier1),
-      targetRevenueTier2: safeNumber(merged.targetRevenueTier2),
-      targetRevenueTier3: safeNumber(merged.targetRevenueTier3),
-
-      bonusValueRevenueT1: safeNumber(merged.bonusValueRevenueT1),
-      bonusValueRevenueT2: safeNumber(merged.bonusValueRevenueT2),
-      bonusValueRevenueT3: safeNumber(merged.bonusValueRevenueT3),
-    };
-  } catch {
-    return DEFAULT_DATA;
-  }
+function clampNonNeg(n: number) {
+  const v = Number.isFinite(n) ? n : 0;
+  return Math.max(0, v);
 }
 
 export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<MetricsData>(() => loadFromStorage());
+  const [data, setData] = useState<MetricsData>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return DEFAULT_DATA;
+      const parsed = JSON.parse(raw) as Partial<MetricsData> | null;
+      return { ...DEFAULT_DATA, ...(parsed ?? {}) };
+    } catch {
+      return DEFAULT_DATA;
+    }
+  });
 
-  // grava sempre que mudar
+  // autosave também (pra não perder)
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
-      // não quebra o app
+      // ignore
     }
   }, [data]);
 
   const calculations = useMemo<MetricsCalculations>(() => {
-    // trava do ticket: libera ao atingir 1200 vendas (padrão que você estava usando)
-    const isTicketLocked = data.currentSales < 1200;
+    const team = Math.max(1, clampNonNeg(data.teamSize));
 
-    // meta volume
-    const salesDone = data.currentSales >= data.targetSales;
+    const salesDone = clampNonNeg(data.currentSales) >= clampNonNeg(data.targetSales) && data.targetSales > 0;
+    const isTicketLocked = !salesDone; // trava por vendas (igual sua regra)
+    const ticketDone = clampNonNeg(data.currentTicket) >= clampNonNeg(data.targetTicket) && data.targetTicket > 0 && !isTicketLocked;
 
-    // meta ticket (só vale se destravar)
-    const ticketDone = !isTicketLocked && data.currentTicket >= data.targetTicket;
+    // faturamento: maior tier atingido
+    const curRev = clampNonNeg(data.currentRevenue);
+    const t1 = clampNonNeg(data.targetRevenueTier1);
+    const t2 = clampNonNeg(data.targetRevenueTier2);
+    const t3 = clampNonNeg(data.targetRevenueTier3);
 
-    // meta faturamento (pega SOMENTE o maior nível atingido)
     let revenueBonus = 0;
-    if (data.currentRevenue >= data.targetRevenueTier3) revenueBonus = data.bonusValueRevenueT3;
-    else if (data.currentRevenue >= data.targetRevenueTier2) revenueBonus = data.bonusValueRevenueT2;
-    else if (data.currentRevenue >= data.targetRevenueTier1) revenueBonus = data.bonusValueRevenueT1;
+    if (t3 > 0 && curRev >= t3) revenueBonus = clampNonNeg(data.bonusValueRevenueT3);
+    else if (t2 > 0 && curRev >= t2) revenueBonus = clampNonNeg(data.bonusValueRevenueT2);
+    else if (t1 > 0 && curRev >= t1) revenueBonus = clampNonNeg(data.bonusValueRevenueT1);
 
-    const totalIndividual =
-      (salesDone ? data.bonusValueSales : 0) +
-      (ticketDone ? data.bonusValueTicket : 0) +
+    const teamBonus =
+      (salesDone ? clampNonNeg(data.bonusValueSales) : 0) +
+      (ticketDone ? clampNonNeg(data.bonusValueTicket) : 0) +
       revenueBonus;
 
-    // potencial máximo = vendas + ticket + nível 3 de faturamento
-    const maxPotentialIndividual = data.bonusValueSales + data.bonusValueTicket + data.bonusValueRevenueT3;
+    const maxRevenueBonus = Math.max(
+      clampNonNeg(data.bonusValueRevenueT1),
+      clampNonNeg(data.bonusValueRevenueT2),
+      clampNonNeg(data.bonusValueRevenueT3),
+    );
 
-    return { isTicketLocked, totalIndividual, maxPotentialIndividual };
+    const maxTeam =
+      clampNonNeg(data.bonusValueSales) +
+      clampNonNeg(data.bonusValueTicket) +
+      maxRevenueBonus;
+
+    return {
+      isTicketLocked,
+      totalTeam: teamBonus,
+      totalIndividual: teamBonus / team,
+
+      maxPotentialTeam: maxTeam,
+      maxPotentialIndividual: maxTeam / team,
+    };
   }, [data]);
 
-  const updateData = (patch: Partial<MetricsData>) => {
-    setData((prev) => ({ ...prev, ...patch }));
+  const save = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // ignore
+    }
   };
 
-  const setAllData = (next: MetricsData) => setData(next);
-
-  const reset = () => setData(DEFAULT_DATA);
+  const resetDefaults = () => {
+    setData(DEFAULT_DATA);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
+    } catch {
+      // ignore
+    }
+  };
 
   return (
-    <MetricsContext.Provider value={{ data, calculations, updateData, setAllData, reset }}>
+    <MetricsContext.Provider value={{ data, calculations, setData, save, resetDefaults }}>
       {children}
     </MetricsContext.Provider>
   );
