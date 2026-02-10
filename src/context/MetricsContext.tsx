@@ -1,141 +1,172 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-import { DEFAULT_METRICS } from '../constants';
-import { MetricsCalculations, MetricsContextValue, MetricsData, RevenueTier } from '../types';
+import React, { createContext, useContext, useMemo, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'go-coffee-metas-v1';
+export type MetricsData = {
+  // header
+  currentMonth: string;       // ex: "FEVEREIRO 2026"
+  dayOfMonth: number;         // ex: 10
+  teamSize: number;           // ex: 3
+  daysRemaining: number;      // ex: 19
 
-function clampPct(n: number) {
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(100, n));
-}
+  // metas
+  currentSales: number;
+  targetSales: number;
+  bonusValueSales: number;
 
-function safeNum(n: unknown) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : 0;
-}
+  currentTicket: number;
+  targetTicket: number;
+  bonusValueTicket: number;
 
-function calculate(data: MetricsData): MetricsCalculations {
-  const teamSize = Math.max(1, Math.floor(safeNum(data.teamSize)));
+  currentRevenue: number;
+  targetRevenueTier1: number;
+  targetRevenueTier2: number;
+  targetRevenueTier3: number;
 
-  const currentSales = safeNum(data.currentSales);
-  const targetSales = Math.max(0, safeNum(data.targetSales));
-  const salesPct = targetSales > 0 ? clampPct((currentSales / targetSales) * 100) : 0;
-  const salesDone = targetSales > 0 ? currentSales >= targetSales : false;
-  const gapSales = Math.max(0, targetSales - currentSales);
+  bonusValueRevenueT1: number;
+  bonusValueRevenueT2: number;
+  bonusValueRevenueT3: number;
+};
 
-  const currentTicket = safeNum(data.currentTicket);
-  const targetTicket = safeNum(data.targetTicket);
-  // Ticket: se target = 0, pct 0. Se ticket >= target, 100.
-  const ticketPct =
-    targetTicket > 0 ? clampPct((currentTicket / targetTicket) * 100) : 0;
-  const ticketDone = targetTicket > 0 ? currentTicket >= targetTicket : false;
-  const gapTicket = targetTicket > 0 ? Math.max(0, targetTicket - currentTicket) : 0;
+export type MetricsCalculations = {
+  isTicketLocked: boolean;
+  totalIndividual: number;
+  maxPotentialIndividual: number;
+};
 
-  const currentRevenue = safeNum(data.currentRevenue);
-  const t1 = Math.max(0, safeNum(data.targetRevenueTier1));
-  const t2 = Math.max(0, safeNum(data.targetRevenueTier2));
-  const t3 = Math.max(0, safeNum(data.targetRevenueTier3));
+type MetricsContextValue = {
+  data: MetricsData;
+  calculations: MetricsCalculations;
+  updateData: (patch: Partial<MetricsData>) => void;
+  setAllData: (next: MetricsData) => void;
+  reset: () => void;
+};
 
-  let tier: RevenueTier = 0;
-  if (t1 > 0 && currentRevenue >= t1) tier = 1;
-  if (t2 > 0 && currentRevenue >= t2) tier = 2;
-  if (t3 > 0 && currentRevenue >= t3) tier = 3;
+const STORAGE_KEY = 'go-coffee-metrics-v1';
 
-  const nextTarget =
-    tier === 0 ? t1 : tier === 1 ? t2 : tier === 2 ? t3 : t3;
+const DEFAULT_DATA: MetricsData = {
+  currentMonth: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase(),
+  dayOfMonth: Number(new Date().toLocaleDateString('pt-BR', { day: '2-digit' })),
+  teamSize: 3,
+  daysRemaining: 20,
 
-  const revenuePct =
-    nextTarget > 0 ? clampPct((currentRevenue / nextTarget) * 100) : 0;
+  currentSales: 682,
+  targetSales: 3000,
+  bonusValueSales: 200,
 
-  const revenueDone = tier > 0;
-  const gapRevenueToNextTier =
-    nextTarget > 0 ? Math.max(0, nextTarget - currentRevenue) : 0;
+  currentTicket: 29.23,
+  targetTicket: 32,
+  bonusValueTicket: 200,
 
-  // Bônus (se atingido)
-  const bonusSales = salesDone ? safeNum(data.bonusValueSales) : 0;
-  const bonusTicket = ticketDone ? safeNum(data.bonusValueTicket) : 0;
+  currentRevenue: 69634.24,
+  targetRevenueTier1: 35000,
+  targetRevenueTier2: 36000,
+  targetRevenueTier3: 40000,
 
-  let bonusRevenue = 0;
-  if (tier === 1) bonusRevenue = safeNum(data.bonusValueRevenueT1);
-  if (tier === 2) bonusRevenue = safeNum(data.bonusValueRevenueT2);
-  if (tier === 3) bonusRevenue = safeNum(data.bonusValueRevenueT3);
-
-  const totalBonusTeam = Math.max(0, bonusSales + bonusTicket + bonusRevenue);
-  const totalBonusIndividual = totalBonusTeam / teamSize;
-
-  return {
-    salesPct,
-    ticketPct,
-    revenuePct,
-    salesDone,
-    ticketDone,
-    revenueTierAchieved: tier,
-    revenueDone,
-    totalBonusTeam,
-    totalBonusIndividual,
-    gapSales,
-    gapTicket,
-    gapRevenueToNextTier,
-  };
-}
-
-function loadInitial(): MetricsData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_METRICS;
-    const parsed = JSON.parse(raw) as Partial<MetricsData>;
-    return { ...DEFAULT_METRICS, ...parsed };
-  } catch {
-    return DEFAULT_METRICS;
-  }
-}
-
-function persist(data: MetricsData) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // não quebra
-  }
-}
+  bonusValueRevenueT1: 200,
+  bonusValueRevenueT2: 250,
+  bonusValueRevenueT3: 300,
+};
 
 const MetricsContext = createContext<MetricsContextValue | null>(null);
 
-export function MetricsProvider({ children }: { children: React.ReactNode }) {
-  const [data, setDataState] = useState<MetricsData>(() => loadInitial());
-
-  const calculations = useMemo(() => calculate(data), [data]);
-
-  const setData = (next: MetricsData) => {
-    setDataState(next);
-    persist(next);
-  };
-
-  const update = (patch: Partial<MetricsData>) => {
-    setDataState((prev: MetricsData) => {
-      const next = { ...prev, ...patch };
-      persist(next);
-      return next;
-    });
-  };
-
-  const resetDefaults = () => {
-    setDataState(DEFAULT_METRICS);
-    persist(DEFAULT_METRICS);
-  };
-
-  const value: MetricsContextValue = {
-    data,
-    calculations,
-    setData,
-    update,
-    resetDefaults,
-  };
-
-  return <MetricsContext.Provider value={value}>{children}</MetricsContext.Provider>;
+function safeNumber(v: any, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
-export function useMetrics() {
+function loadFromStorage(): MetricsData {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_DATA;
+    const parsed = JSON.parse(raw);
+
+    // merge seguro com defaults
+    const merged: MetricsData = { ...DEFAULT_DATA, ...(parsed as Partial<MetricsData>) };
+
+    // garante tipos numéricos
+    return {
+      ...merged,
+      dayOfMonth: safeNumber(merged.dayOfMonth, DEFAULT_DATA.dayOfMonth),
+      teamSize: safeNumber(merged.teamSize, DEFAULT_DATA.teamSize),
+      daysRemaining: safeNumber(merged.daysRemaining, DEFAULT_DATA.daysRemaining),
+
+      currentSales: safeNumber(merged.currentSales),
+      targetSales: safeNumber(merged.targetSales),
+      bonusValueSales: safeNumber(merged.bonusValueSales),
+
+      currentTicket: safeNumber(merged.currentTicket),
+      targetTicket: safeNumber(merged.targetTicket),
+      bonusValueTicket: safeNumber(merged.bonusValueTicket),
+
+      currentRevenue: safeNumber(merged.currentRevenue),
+      targetRevenueTier1: safeNumber(merged.targetRevenueTier1),
+      targetRevenueTier2: safeNumber(merged.targetRevenueTier2),
+      targetRevenueTier3: safeNumber(merged.targetRevenueTier3),
+
+      bonusValueRevenueT1: safeNumber(merged.bonusValueRevenueT1),
+      bonusValueRevenueT2: safeNumber(merged.bonusValueRevenueT2),
+      bonusValueRevenueT3: safeNumber(merged.bonusValueRevenueT3),
+    };
+  } catch {
+    return DEFAULT_DATA;
+  }
+}
+
+export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [data, setData] = useState<MetricsData>(() => loadFromStorage());
+
+  // grava sempre que mudar
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // não quebra o app
+    }
+  }, [data]);
+
+  const calculations = useMemo<MetricsCalculations>(() => {
+    // trava do ticket: libera ao atingir 1200 vendas (padrão que você estava usando)
+    const isTicketLocked = data.currentSales < 1200;
+
+    // meta volume
+    const salesDone = data.currentSales >= data.targetSales;
+
+    // meta ticket (só vale se destravar)
+    const ticketDone = !isTicketLocked && data.currentTicket >= data.targetTicket;
+
+    // meta faturamento (pega SOMENTE o maior nível atingido)
+    let revenueBonus = 0;
+    if (data.currentRevenue >= data.targetRevenueTier3) revenueBonus = data.bonusValueRevenueT3;
+    else if (data.currentRevenue >= data.targetRevenueTier2) revenueBonus = data.bonusValueRevenueT2;
+    else if (data.currentRevenue >= data.targetRevenueTier1) revenueBonus = data.bonusValueRevenueT1;
+
+    const totalIndividual =
+      (salesDone ? data.bonusValueSales : 0) +
+      (ticketDone ? data.bonusValueTicket : 0) +
+      revenueBonus;
+
+    // potencial máximo = vendas + ticket + nível 3 de faturamento
+    const maxPotentialIndividual = data.bonusValueSales + data.bonusValueTicket + data.bonusValueRevenueT3;
+
+    return { isTicketLocked, totalIndividual, maxPotentialIndividual };
+  }, [data]);
+
+  const updateData = (patch: Partial<MetricsData>) => {
+    setData((prev) => ({ ...prev, ...patch }));
+  };
+
+  const setAllData = (next: MetricsData) => setData(next);
+
+  const reset = () => setData(DEFAULT_DATA);
+
+  return (
+    <MetricsContext.Provider value={{ data, calculations, updateData, setAllData, reset }}>
+      {children}
+    </MetricsContext.Provider>
+  );
+};
+
+export const useMetrics = () => {
   const ctx = useContext(MetricsContext);
-  if (!ctx) throw new Error('useMetrics deve ser usado dentro de <MetricsProvider>');
+  if (!ctx) throw new Error('useMetrics must be used within MetricsProvider');
   return ctx;
-}
+};
