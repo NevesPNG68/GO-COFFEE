@@ -1,260 +1,148 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useMetrics } from '../context/MetricsContext';
 import { Save, RotateCcw } from 'lucide-react';
-
-function toNumOrZero(s: string) {
-  if (typeof s !== 'string' || s.trim() === '') return 0;
-  const n = Number(s.replace(',', '.'));
-  return Number.isFinite(n) ? n : 0;
-}
 
 const UpdateForm: React.FC = () => {
   const { data, setData, resetDefaults } = useMetrics();
 
-  // Estado local do formulário como strings para permitir edição livre (incluindo apagar tudo)
+  // Inicializa o estado local apenas uma vez com os dados do contexto
   const [form, setForm] = useState({
-    currentMonth: '',
-    dayOfMonth: '',
-    teamSize: '',
-    daysRemaining: '',
-    currentSales: '',
-    targetSales: '',
-    bonusValueSales: '',
-    currentTicket: '',
-    targetTicket: '',
-    bonusValueTicket: '',
-    currentRevenue: '',
-    targetRevenueTier1: '',
-    targetRevenueTier2: '',
-    targetRevenueTier3: '',
-    bonusValueRevenueT1: '',
-    bonusValueRevenueT2: '',
-    bonusValueRevenueT3: '',
+    currentMonth: String(data.currentMonth || ''),
+    dayOfMonth: String(data.dayOfMonth || ''),
+    teamSize: String(data.teamSize || ''),
+    daysRemaining: String(data.daysRemaining || ''),
+    currentSales: String(data.currentSales || ''),
+    targetSales: String(data.targetSales || ''),
+    bonusValueSales: String(data.bonusValueSales || ''),
+    currentTicket: String(data.currentTicket || ''),
+    targetTicket: String(data.targetTicket || ''),
+    bonusValueTicket: String(data.bonusValueTicket || ''),
+    currentRevenue: String(data.currentRevenue || ''),
+    targetRevenueTier1: String(data.targetRevenueTier1 || ''),
+    targetRevenueTier2: String(data.targetRevenueTier2 || ''),
+    targetRevenueTier3: String(data.targetRevenueTier3 || ''),
+    bonusValueRevenueT1: String(data.bonusValueRevenueT1 || ''),
+    bonusValueRevenueT2: String(data.bonusValueRevenueT2 || ''),
+    bonusValueRevenueT3: String(data.bonusValueRevenueT3 || ''),
   });
 
-  // Sincroniza o formulário quando os dados do contexto mudam (ex: no carregamento inicial ou reset)
-  useEffect(() => {
-    setForm({
-      currentMonth: String(data.currentMonth ?? ''),
-      dayOfMonth: String(data.dayOfMonth ?? ''),
-      teamSize: String(data.teamSize ?? ''),
-      daysRemaining: String(data.daysRemaining ?? ''),
-      currentSales: String(data.currentSales ?? ''),
-      targetSales: String(data.targetSales ?? ''),
-      bonusValueSales: String(data.bonusValueSales ?? ''),
-      currentTicket: String(data.currentTicket ?? ''),
-      targetTicket: String(data.targetTicket ?? ''),
-      bonusValueTicket: String(data.bonusValueTicket ?? ''),
-      currentRevenue: String(data.currentRevenue ?? ''),
-      targetRevenueTier1: String(data.targetRevenueTier1 ?? ''),
-      targetRevenueTier2: String(data.targetRevenueTier2 ?? ''),
-      targetRevenueTier3: String(data.targetRevenueTier3 ?? ''),
-      bonusValueRevenueT1: String(data.bonusValueRevenueT1 ?? ''),
-      bonusValueRevenueT2: String(data.bonusValueRevenueT2 ?? ''),
-      bonusValueRevenueT3: String(data.bonusValueRevenueT3 ?? ''),
-    });
-  }, [data]);
-
-  const onSave = () => {
-    setData({
-      currentMonth: form.currentMonth,
-      dayOfMonth: Math.max(0, Math.floor(toNumOrZero(form.dayOfMonth))),
-      teamSize: Math.max(1, Math.floor(toNumOrZero(form.teamSize))),
-      daysRemaining: Math.max(0, Math.floor(toNumOrZero(form.daysRemaining))),
-      currentSales: Math.max(0, Math.floor(toNumOrZero(form.currentSales))),
-      targetSales: Math.max(0, Math.floor(toNumOrZero(form.targetSales))),
-      bonusValueSales: Math.max(0, toNumOrZero(form.bonusValueSales)),
-      currentTicket: Math.max(0, toNumOrZero(form.currentTicket)),
-      targetTicket: Math.max(0, toNumOrZero(form.targetTicket)),
-      bonusValueTicket: Math.max(0, toNumOrZero(form.bonusValueTicket)),
-      currentRevenue: Math.max(0, toNumOrZero(form.currentRevenue)),
-      targetRevenueTier1: Math.max(0, toNumOrZero(form.targetRevenueTier1)),
-      targetRevenueTier2: Math.max(0, toNumOrZero(form.targetRevenueTier2)),
-      targetRevenueTier3: Math.max(0, toNumOrZero(form.targetRevenueTier3)),
-      bonusValueRevenueT1: Math.max(0, toNumOrZero(form.bonusValueRevenueT1)),
-      bonusValueRevenueT2: Math.max(0, toNumOrZero(form.bonusValueRevenueT2)),
-      bonusValueRevenueT3: Math.max(0, toNumOrZero(form.bonusValueRevenueT3)),
-    });
-
-    // O useEffect no MetricsContext cuidará de salvar no localStorage
-    alert('Configurações salvas com sucesso! ✅');
+  const handleChange = (field: string, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const Field = ({
-    label,
-    value,
-    onChange,
-    placeholder,
-    inputMode = 'decimal',
-  }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    placeholder?: string;
-    inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
-  }) => (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1">{label}</div>
+  const handleSave = () => {
+    const toNum = (val: string) => {
+      const n = parseFloat(val.replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    };
+
+    setData({
+      currentMonth: form.currentMonth,
+      dayOfMonth: Math.floor(toNum(form.dayOfMonth)),
+      teamSize: Math.max(1, Math.floor(toNum(form.teamSize))),
+      daysRemaining: Math.floor(toNum(form.daysRemaining)),
+      currentSales: Math.floor(toNum(form.currentSales)),
+      targetSales: Math.floor(toNum(form.targetSales)),
+      bonusValueSales: toNum(form.bonusValueSales),
+      currentTicket: toNum(form.currentTicket),
+      targetTicket: toNum(form.targetTicket),
+      bonusValueTicket: toNum(form.bonusValueTicket),
+      currentRevenue: toNum(form.currentRevenue),
+      targetRevenueTier1: toNum(form.targetRevenueTier1),
+      targetRevenueTier2: toNum(form.targetRevenueTier2),
+      targetRevenueTier3: toNum(form.targetRevenueTier3),
+      bonusValueRevenueT1: toNum(form.bonusValueRevenueT1),
+      bonusValueRevenueT2: toNum(form.bonusValueRevenueT2),
+      bonusValueRevenueT3: toNum(form.bonusValueRevenueT3),
+    });
+    alert('Dados salvos com sucesso! ✅');
+  };
+
+  const handleReset = () => {
+    if (window.confirm('Deseja restaurar os valores padrão?')) {
+      resetDefaults();
+      // O resetDefaults vai mudar o 'data' no contexto, mas para atualizar o form local:
+      window.location.reload(); 
+    }
+  };
+
+  const InputField = ({ label, field, type = "text" }: { label: string, field: keyof typeof form, type?: string }) => (
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] font-bold uppercase text-gray-500">{label}</label>
       <input
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        inputMode={inputMode}
+        type={type}
+        value={form[field]}
+        onChange={(e) => handleChange(field, e.target.value)}
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-brand-orange"
       />
-    </label>
+    </div>
   );
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Field
-            label="Mês (rótulo)"
-            value={form.currentMonth}
-            onChange={(v) => setForm((p) => ({ ...p, currentMonth: v }))}
-            placeholder="Fevereiro 2026"
-            inputMode="text"
-          />
-          <Field
-            label="Dia do mês"
-            value={form.dayOfMonth}
-            onChange={(v) => setForm((p) => ({ ...p, dayOfMonth: v }))}
-            placeholder="19"
-            inputMode="numeric"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Field
-              label="Equipe"
-              value={form.teamSize}
-              onChange={(v) => setForm((p) => ({ ...p, teamSize: v }))}
-              placeholder="2"
-              inputMode="numeric"
-            />
-            <Field
-              label="Dias restantes"
-              value={form.daysRemaining}
-              onChange={(v) => setForm((p) => ({ ...p, daysRemaining: v }))}
-              placeholder="18"
-              inputMode="numeric"
-            />
+    <div className="max-w-4xl mx-auto space-y-6 pb-10">
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+        <h2 className="text-lg font-black text-gray-900">Informações Gerais</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <InputField label="Mês" field="currentMonth" />
+          <InputField label="Dia Atual" field="dayOfMonth" />
+          <InputField label="Equipe (Qtd)" field="teamSize" />
+          <InputField label="Dias Restantes" field="daysRemaining" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-orange-50/50 p-6 rounded-2xl border border-orange-100 space-y-4">
+          <h2 className="text-lg font-black text-orange-900">Meta 01: Volume</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <InputField label="Realizado" field="currentSales" />
+            <InputField label="Meta" field="targetSales" />
+          </div>
+          <InputField label="Valor do Bônus" field="bonusValueSales" />
+        </div>
+
+        <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100 space-y-4">
+          <h2 className="text-lg font-black text-green-900">Meta 02: Ticket</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <InputField label="Atual" field="currentTicket" />
+            <InputField label="Meta" field="targetTicket" />
+          </div>
+          <InputField label="Valor do Bônus" field="bonusValueTicket" />
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+        <h2 className="text-lg font-black text-gray-900">Meta 03: Faturamento</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <InputField label="Faturamento Atual" field="currentRevenue" />
+            <InputField label="Meta Nível 1" field="targetRevenueTier1" />
+            <InputField label="Meta Nível 2" field="targetRevenueTier2" />
+            <InputField label="Meta Nível 3" field="targetRevenueTier3" />
+          </div>
+          <div className="space-y-4">
+            <div className="h-[68px] hidden md:block" /> {/* Spacer */}
+            <InputField label="Bônus Nível 1" field="bonusValueRevenueT1" />
+            <InputField label="Bônus Nível 2" field="bonusValueRevenueT2" />
+            <InputField label="Bônus Nível 3" field="bonusValueRevenueT3" />
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 md:p-6">
-          <h3 className="text-lg font-black text-gray-900 mb-4">Meta 01: Volume de Vendas</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Field
-              label="Realizado"
-              value={form.currentSales}
-              onChange={(v) => setForm((p) => ({ ...p, currentSales: v }))}
-              inputMode="numeric"
-            />
-            <Field
-              label="Meta (qtd)"
-              value={form.targetSales}
-              onChange={(v) => setForm((p) => ({ ...p, targetSales: v }))}
-              inputMode="numeric"
-            />
-          </div>
-          <div className="mt-4">
-            <Field
-              label="Valor do bônus (se atingido)"
-              value={form.bonusValueSales}
-              onChange={(v) => setForm((p) => ({ ...p, bonusValueSales: v }))}
-            />
-          </div>
-        </div>
-
-        <div className="bg-green-50 border border-green-100 rounded-2xl p-4 md:p-6">
-          <h3 className="text-lg font-black text-gray-900 mb-4">Meta 02: Ticket Médio</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Field
-              label="Atual"
-              value={form.currentTicket}
-              onChange={(v) => setForm((p) => ({ ...p, currentTicket: v }))}
-            />
-            <Field
-              label="Meta"
-              value={form.targetTicket}
-              onChange={(v) => setForm((p) => ({ ...p, targetTicket: v }))}
-            />
-          </div>
-          <div className="mt-4">
-            <Field
-              label="Valor do bônus (se atingido)"
-              value={form.bonusValueTicket}
-              onChange={(v) => setForm((p) => ({ ...p, bonusValueTicket: v }))}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6">
-        <h3 className="text-lg font-black text-gray-900 mb-4">Meta 03: Faturamento Bruto (Escalonado)</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-          <Field
-            label="Faturamento atual"
-            value={form.currentRevenue}
-            onChange={(v) => setForm((p) => ({ ...p, currentRevenue: v }))}
-          />
-          <div className="hidden md:block" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <Field
-              label="Meta Nível 1 (Bronze)"
-              value={form.targetRevenueTier1}
-              onChange={(v) => setForm((p) => ({ ...p, targetRevenueTier1: v }))}
-            />
-            <Field
-              label="Meta Nível 2 (Prata)"
-              value={form.targetRevenueTier2}
-              onChange={(v) => setForm((p) => ({ ...p, targetRevenueTier2: v }))}
-            />
-            <Field
-              label="Meta Nível 3 (Ouro)"
-              value={form.targetRevenueTier3}
-              onChange={(v) => setForm((p) => ({ ...p, targetRevenueTier3: v }))}
-            />
-          </div>
-          <div className="space-y-3">
-            <Field
-              label="Bônus Nível 1"
-              value={form.bonusValueRevenueT1}
-              onChange={(v) => setForm((p) => ({ ...p, bonusValueRevenueT1: v }))}
-            />
-            <Field
-              label="Bônus Nível 2"
-              value={form.bonusValueRevenueT2}
-              onChange={(v) => setForm((p) => ({ ...p, bonusValueRevenueT2: v }))}
-            />
-            <Field
-              label="Bônus Nível 3"
-              value={form.bonusValueRevenueT3}
-              onChange={(v) => setForm((p) => ({ ...p, bonusValueRevenueT3: v }))}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-end">
-          <button
-            onClick={resetDefaults}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50"
-          >
-            <RotateCcw size={18} />
-            Restaurar Padrões
-          </button>
-          <button
-            onClick={onSave}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-3 text-sm font-black text-white hover:opacity-95"
-          >
-            <Save size={18} />
-            Salvar Configurações
-          </button>
-        </div>
+      <div className="flex flex-col md:flex-row gap-3 justify-end pt-4">
+        <button
+          onClick={handleReset}
+          className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition"
+        >
+          <RotateCcw size={18} />
+          Restaurar Padrões
+        </button>
+        <button
+          onClick={handleSave}
+          className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-brand-orange text-white font-black shadow-lg shadow-orange-200 hover:scale-[1.02] active:scale-[0.98] transition"
+        >
+          <Save size={18} />
+          Salvar Alterações
+        </button>
       </div>
     </div>
   );
