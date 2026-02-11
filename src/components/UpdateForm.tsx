@@ -3,54 +3,48 @@ import { useMetrics } from '../context/MetricsContext';
 import { Save, RotateCcw } from 'lucide-react';
 
 function toNumOrZero(s: string) {
-  if (s.trim() === '') return 0;
-  const n = Number(String(s).replace(',', '.'));
+  if (typeof s !== 'string' || s.trim() === '') return 0;
+  const n = Number(s.replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
 }
 
 const UpdateForm: React.FC = () => {
-  const { data, setData, save, resetDefaults } = useMetrics();
+  const { data, setData, resetDefaults } = useMetrics();
 
-  // inputs como STRING para não travar (principalmente dias)
-  const [form, setForm] = useState(() => ({
-    currentMonth: String(data.currentMonth ?? ''),
-    dayOfMonth: String(data.dayOfMonth ?? ''),
-    teamSize: String(data.teamSize ?? ''),
-    daysRemaining: String(data.daysRemaining ?? ''),
+  // Estado local do formulário como strings para permitir edição livre (incluindo apagar tudo)
+  const [form, setForm] = useState({
+    currentMonth: '',
+    dayOfMonth: '',
+    teamSize: '',
+    daysRemaining: '',
+    currentSales: '',
+    targetSales: '',
+    bonusValueSales: '',
+    currentTicket: '',
+    targetTicket: '',
+    bonusValueTicket: '',
+    currentRevenue: '',
+    targetRevenueTier1: '',
+    targetRevenueTier2: '',
+    targetRevenueTier3: '',
+    bonusValueRevenueT1: '',
+    bonusValueRevenueT2: '',
+    bonusValueRevenueT3: '',
+  });
 
-    currentSales: String(data.currentSales ?? ''),
-    targetSales: String(data.targetSales ?? ''),
-    bonusValueSales: String(data.bonusValueSales ?? ''),
-
-    currentTicket: String(data.currentTicket ?? ''),
-    targetTicket: String(data.targetTicket ?? ''),
-    bonusValueTicket: String(data.bonusValueTicket ?? ''),
-
-    currentRevenue: String(data.currentRevenue ?? ''),
-    targetRevenueTier1: String(data.targetRevenueTier1 ?? ''),
-    targetRevenueTier2: String(data.targetRevenueTier2 ?? ''),
-    targetRevenueTier3: String(data.targetRevenueTier3 ?? ''),
-    bonusValueRevenueT1: String(data.bonusValueRevenueT1 ?? ''),
-    bonusValueRevenueT2: String(data.bonusValueRevenueT2 ?? ''),
-    bonusValueRevenueT3: String(data.bonusValueRevenueT3 ?? ''),
-  }));
-
-  // se resetar no contexto, espelha no form
+  // Sincroniza o formulário quando os dados do contexto mudam (ex: no carregamento inicial ou reset)
   useEffect(() => {
     setForm({
       currentMonth: String(data.currentMonth ?? ''),
       dayOfMonth: String(data.dayOfMonth ?? ''),
       teamSize: String(data.teamSize ?? ''),
       daysRemaining: String(data.daysRemaining ?? ''),
-
       currentSales: String(data.currentSales ?? ''),
       targetSales: String(data.targetSales ?? ''),
       bonusValueSales: String(data.bonusValueSales ?? ''),
-
       currentTicket: String(data.currentTicket ?? ''),
       targetTicket: String(data.targetTicket ?? ''),
       bonusValueTicket: String(data.bonusValueTicket ?? ''),
-
       currentRevenue: String(data.currentRevenue ?? ''),
       targetRevenueTier1: String(data.targetRevenueTier1 ?? ''),
       targetRevenueTier2: String(data.targetRevenueTier2 ?? ''),
@@ -62,22 +56,17 @@ const UpdateForm: React.FC = () => {
   }, [data]);
 
   const onSave = () => {
-    setData((prev) => ({
-      ...prev,
+    setData({
       currentMonth: form.currentMonth,
-
       dayOfMonth: Math.max(0, Math.floor(toNumOrZero(form.dayOfMonth))),
       teamSize: Math.max(1, Math.floor(toNumOrZero(form.teamSize))),
       daysRemaining: Math.max(0, Math.floor(toNumOrZero(form.daysRemaining))),
-
       currentSales: Math.max(0, Math.floor(toNumOrZero(form.currentSales))),
       targetSales: Math.max(0, Math.floor(toNumOrZero(form.targetSales))),
       bonusValueSales: Math.max(0, toNumOrZero(form.bonusValueSales)),
-
       currentTicket: Math.max(0, toNumOrZero(form.currentTicket)),
       targetTicket: Math.max(0, toNumOrZero(form.targetTicket)),
       bonusValueTicket: Math.max(0, toNumOrZero(form.bonusValueTicket)),
-
       currentRevenue: Math.max(0, toNumOrZero(form.currentRevenue)),
       targetRevenueTier1: Math.max(0, toNumOrZero(form.targetRevenueTier1)),
       targetRevenueTier2: Math.max(0, toNumOrZero(form.targetRevenueTier2)),
@@ -85,11 +74,10 @@ const UpdateForm: React.FC = () => {
       bonusValueRevenueT1: Math.max(0, toNumOrZero(form.bonusValueRevenueT1)),
       bonusValueRevenueT2: Math.max(0, toNumOrZero(form.bonusValueRevenueT2)),
       bonusValueRevenueT3: Math.max(0, toNumOrZero(form.bonusValueRevenueT3)),
-    }));
+    });
 
-    // garante gravação imediata
-    setTimeout(() => save(), 0);
-    alert('Configurações salvas ✅');
+    // O useEffect no MetricsContext cuidará de salvar no localStorage
+    alert('Configurações salvas com sucesso! ✅');
   };
 
   const Field = ({
@@ -119,7 +107,6 @@ const UpdateForm: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top info */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field
@@ -155,7 +142,6 @@ const UpdateForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Meta 01 + Meta 02 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 md:p-6">
           <h3 className="text-lg font-black text-gray-900 mb-4">Meta 01: Volume de Vendas</h3>
@@ -206,20 +192,16 @@ const UpdateForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Meta 03 */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6">
         <h3 className="text-lg font-black text-gray-900 mb-4">Meta 03: Faturamento Bruto (Escalonado)</h3>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           <Field
             label="Faturamento atual"
             value={form.currentRevenue}
             onChange={(v) => setForm((p) => ({ ...p, currentRevenue: v }))}
           />
-          {/* equipe já fica no topo */}
           <div className="hidden md:block" />
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3">
             <Field
@@ -238,7 +220,6 @@ const UpdateForm: React.FC = () => {
               onChange={(v) => setForm((p) => ({ ...p, targetRevenueTier3: v }))}
             />
           </div>
-
           <div className="space-y-3">
             <Field
               label="Bônus Nível 1"
@@ -258,7 +239,6 @@ const UpdateForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer buttons */}
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-end">
           <button
             onClick={resetDefaults}
@@ -267,7 +247,6 @@ const UpdateForm: React.FC = () => {
             <RotateCcw size={18} />
             Restaurar Padrões
           </button>
-
           <button
             onClick={onSave}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-orange px-4 py-3 text-sm font-black text-white hover:opacity-95"

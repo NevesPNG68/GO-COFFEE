@@ -1,22 +1,16 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 
 export type MetricsData = {
-  currentMonth: string;        // ex: "Fevereiro 2026"
-  dayOfMonth: number;          // dia do mês
-  teamSize: number;            // qtd pessoas
-  daysRemaining: number;       // dias restantes (campo que estava travando)
-
-  // Meta 01 - volume
+  currentMonth: string;
+  dayOfMonth: number;
+  teamSize: number;
+  daysRemaining: number;
   currentSales: number;
   targetSales: number;
   bonusValueSales: number;
-
-  // Meta 02 - ticket
   currentTicket: number;
   targetTicket: number;
   bonusValueTicket: number;
-
-  // Meta 03 - faturamento (3 níveis)
   currentRevenue: number;
   targetRevenueTier1: number;
   targetRevenueTier2: number;
@@ -28,10 +22,8 @@ export type MetricsData = {
 
 export type MetricsCalculations = {
   isTicketLocked: boolean;
-
   totalTeam: number;
   totalIndividual: number;
-
   maxPotentialTeam: number;
   maxPotentialIndividual: number;
 };
@@ -39,8 +31,7 @@ export type MetricsCalculations = {
 type MetricsContextValue = {
   data: MetricsData;
   calculations: MetricsCalculations;
-
-  setData: React.Dispatch<React.SetStateAction<MetricsData>>;
+  setData: (data: MetricsData) => void;
   save: () => void;
   resetDefaults: () => void;
 };
@@ -52,15 +43,12 @@ const DEFAULT_DATA: MetricsData = {
   dayOfMonth: 18,
   teamSize: 2,
   daysRemaining: 18,
-
   currentSales: 328,
   targetSales: 1200,
   bonusValueSales: 150,
-
   currentTicket: 29.7,
   targetTicket: 29.5,
   bonusValueTicket: 250,
-
   currentRevenue: 9700,
   targetRevenueTier1: 35000,
   targetRevenueTier2: 36000,
@@ -78,7 +66,7 @@ function clampNonNeg(n: number) {
 }
 
 export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [data, setData] = useState<MetricsData>(() => {
+  const [data, setDataState] = useState<MetricsData>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return DEFAULT_DATA;
@@ -89,23 +77,34 @@ export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   });
 
-  // autosave também (pra não perder)
-  useEffect(() => {
+  // Função para atualizar dados e salvar imediatamente
+  const setData = (newData: MetricsData) => {
+    setDataState(newData);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    } catch (e) {
+      console.error('Erro ao salvar no localStorage:', e);
+    }
+  };
+
+  const save = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error('Erro ao salvar no localStorage:', e);
     }
-  }, [data]);
+  };
+
+  const resetDefaults = () => {
+    setData(DEFAULT_DATA);
+  };
 
   const calculations = useMemo<MetricsCalculations>(() => {
     const team = Math.max(1, clampNonNeg(data.teamSize));
-
     const salesDone = clampNonNeg(data.currentSales) >= clampNonNeg(data.targetSales) && data.targetSales > 0;
-    const isTicketLocked = !salesDone; // trava por vendas (igual sua regra)
+    const isTicketLocked = !salesDone;
     const ticketDone = clampNonNeg(data.currentTicket) >= clampNonNeg(data.targetTicket) && data.targetTicket > 0 && !isTicketLocked;
 
-    // faturamento: maior tier atingido
     const curRev = clampNonNeg(data.currentRevenue);
     const t1 = clampNonNeg(data.targetRevenueTier1);
     const t2 = clampNonNeg(data.targetRevenueTier2);
@@ -136,28 +135,10 @@ export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isTicketLocked,
       totalTeam: teamBonus,
       totalIndividual: teamBonus / team,
-
       maxPotentialTeam: maxTeam,
       maxPotentialIndividual: maxTeam / team,
     };
   }, [data]);
-
-  const save = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch {
-      // ignore
-    }
-  };
-
-  const resetDefaults = () => {
-    setData(DEFAULT_DATA);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DATA));
-    } catch {
-      // ignore
-    }
-  };
 
   return (
     <MetricsContext.Provider value={{ data, calculations, setData, save, resetDefaults }}>
